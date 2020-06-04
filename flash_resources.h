@@ -22,7 +22,21 @@ struct FlashColorEffect {
 
     FlashColorEffect() : 
         add(Color()), 
-        mult(Color()) {}
+        mult(Color(1,1,1,1)) {}
+
+    inline FlashColorEffect interpolate(FlashColorEffect effect, float amount) {
+        FlashColorEffect new_effect;
+        new_effect.mult = mult.linear_interpolate(effect.mult, amount);
+        new_effect.add = mult.linear_interpolate(effect.add, amount);
+        return new_effect;
+    }
+
+    inline FlashColorEffect operator *(FlashColorEffect effect) {
+        FlashColorEffect new_effect;
+        new_effect.mult = mult * effect.mult;
+        new_effect.add = add * effect.mult + effect.add;
+        return new_effect;
+    }
 };
 
 class FlashElement: public Resource {
@@ -243,11 +257,11 @@ class FlashInstance: public FlashDrawing {
     int first_frame;
     String loop;
     String library_item_name;
-    FlashColorEffect color_effect;
 
     Ref<FlashTimeline> timeline;
 
 public:
+    FlashColorEffect color_effect;
     FlashInstance():
         center_point(Vector2()),
         transformation_point(Vector2()),

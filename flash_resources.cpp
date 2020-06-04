@@ -321,7 +321,7 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 };
-void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect effect) {
+void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
     float frame_time = time;// / document->get_frame_size();
     int frame_idx = static_cast<int>(floor(frame_time)) % duration;
@@ -350,14 +350,29 @@ void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transfor
     for (List<Ref<FlashDrawing>>::Element *E = current->elements.front(); E; E = E->next()) {
         Ref<FlashDrawing> elem = E->get();
         Transform2D tr = elem->get_transform();
+        FlashColorEffect effect;
+        FlashInstance *inst = Object::cast_to<FlashInstance>(elem.ptr());
+        if (inst != NULL) {
+            effect = inst->color_effect;
+        }
+        FlashColorEffect next_effect = effect;
+
         if (next.is_valid() && interpolation > 0 && next->elements.size() >= idx+1) {
-            Transform2D to = next->elements[idx]->get_transform();
+            Ref<FlashDrawing> next_elem = next->elements[idx];
+            Transform2D to = next_elem->get_transform();
             Vector2 x = tr[0].linear_interpolate(to[0], interpolation);
             Vector2 y = tr[1].linear_interpolate(to[1], interpolation);
             Vector2 o = tr[2].linear_interpolate(to[2], interpolation);
             tr = Transform2D(x.x, x.y, y.x, y.y, o.x, o.y);
+            FlashInstance *next_inst = Object::cast_to<FlashInstance>(next_elem.ptr());
+            if (next_inst != NULL) {
+                next_effect = next_inst->color_effect;
+            }
         }
-        elem->draw(node, frame_time - current->get_index(), parent_transform * tr, effect);
+        effect = effect.interpolate(next_effect, interpolation);
+
+
+        elem->draw(node, frame_time - current->get_index(), parent_transform * tr, parent_effect*effect);
         idx++;
     }
 }
@@ -559,7 +574,6 @@ Ref<FlashTimeline> FlashInstance::get_timeline() {
 }
 PoolColorArray FlashInstance::get_color_effect() const {
     PoolColorArray effect;
-    effect.resize(2);
     effect.push_back(color_effect.add);
     effect.push_back(color_effect.mult);
     return effect;
@@ -573,7 +587,7 @@ void FlashInstance::set_color_effect(PoolColorArray p_color_effect) {
     if (p_color_effect.size() > 1) {
         color_effect.mult = p_color_effect[1];
     } else {
-        color_effect.mult = Color(1,1,1);
+        color_effect.mult = Color(1,1,1,1);
     }
 }
 Error FlashInstance::parse(Ref<XMLParser> xml) {
@@ -654,7 +668,7 @@ void FlashInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashCol
     if (!tl.is_valid()) return;
     float instance_time =
         loop == "single frame"  ? first_frame :
-        loop == "play once"     ? MIN(first_frame + time, tl->get_duration()) :
+        loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
     
     tl->draw(node, instance_time, tr, effect);
@@ -682,7 +696,7 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
 void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
     node->draw_set_transform_matrix(tr);
     Ref<Texture> tex = document->load_bitmap(library_item_name);
-    node->draw_texture(tex, Vector2());
+    node->draw_texture(tex, Vector2(), effect.mult);
 }
 
 void FlashTween::_bind_methods() {
