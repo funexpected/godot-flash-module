@@ -268,6 +268,9 @@ public:
 class FlashShape: public FlashDrawing {
     GDCLASS(FlashShape, FlashDrawing);
 
+public:
+    virtual Error parse(Ref<XMLParser> xml);
+
 };
 
 class FlashGroup: public FlashDrawing {

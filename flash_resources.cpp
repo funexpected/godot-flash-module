@@ -103,6 +103,7 @@ Error FlashDocument::load_file(const String &p_path) {
     Ref<XMLParser> xml; xml.instance();
     Error err = xml->open(p_path);
     ERR_FAIL_COND_V_MSG(err != Error::OK, err, "Can't open " + p_path);
+    xml->set_meta("path", p_path);
     parent = NULL;
     document = this;
     document_path = p_path.get_base_dir();
@@ -121,6 +122,7 @@ Ref<FlashTimeline> FlashDocument::load_symbol(const String &symbol_name) {
         symbols[symbol_name] = element<FlashTimeline>();
     }
     ERR_FAIL_COND_V_MSG(err != Error::OK, Ref<FlashDocument>(), "Can't open " + symbol_path);
+    xml->set_meta("path", symbol_path);
 
     Ref<FlashTimeline> tl = element<FlashTimeline>();
     symbols[symbol_name] = tl;
@@ -425,6 +427,10 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
             tweens.push_back(add_child<FlashTween>(xml));
     }
     return Error::OK;
+}
+
+Error FlashShape::parse(Ref<XMLParser> xml) {
+    ERR_FAIL_V_MSG(FAILED, String("Vector Shape not supported at ") + xml->get_meta("path"));
 }
 
 void FlashGroup::_bind_methods() {
