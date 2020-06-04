@@ -6,9 +6,14 @@
 FlashDocument *FlashElement::get_document() const {
     return document;
 }
-
+void FlashElement::set_document(FlashDocument *p_document) {
+    document = p_document;
+}
 FlashElement *FlashElement::get_parent() const {
     return parent;
+}
+void FlashElement::set_parent(FlashElement *p_parent) {
+    parent = p_parent;
 }
 void FlashElement::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_eid"), &FlashElement::get_eid);
@@ -22,10 +27,7 @@ void FlashElement::setup(FlashDocument *p_document, FlashElement *p_parent) {
 }
 
 template <class T>  Ref<T> FlashElement::add_child(Ref<XMLParser> parser, List< Ref<T> > *elements) {
-    Ref<T> elem = document->element<T>();
-    //Ref<FlashElement> elem = base;
-    elem->document = document;
-    elem->parent = this;
+    Ref<T> elem = document->element<T>(this);
     if (elements != NULL) elements->push_back(elem);
     elem->parse(parser);
     return elem;
@@ -71,9 +73,11 @@ void FlashDocument::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "bitmaps", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_bitmaps", "get_bitmaps");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "timelines", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timelines", "get_timelines");
 }
-template <class T> Ref<T> FlashDocument::element() {
+template <class T> Ref<T> FlashDocument::element(FlashElement *parent) {
     Ref<T> elem; elem.instance();
     elem->set_eid(last_eid++);
+    elem->set_parent(parent);
+    elem->set_document(this);
     return elem;
 }
 Array FlashDocument::get_timelines() {
@@ -317,10 +321,10 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 };
-void FlashLayer::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect effect) {
     if (type == "guide") return;
     float frame_time = time;// / document->get_frame_size();
-    int frame_idx = static_cast<int>(ceil(frame_time)) % duration;
+    int frame_idx = static_cast<int>(floor(frame_time)) % duration;
     frame_time = frame_idx + frame_time - (int)frame_time;
     
     Ref<FlashFrame> current;
@@ -334,9 +338,27 @@ void FlashLayer::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorE
     }
 
     if (!current.is_valid()) return;
+    
+    float interpolation = 0;
+    float current_time = frame_time - current->get_index();
+    if (current->tweens.size() > 0){
+        Ref<FlashTween>tween = current->tweens.front()->get();
+        interpolation = tween->interpolate(current_time/current->get_duration());
+    }
 
+    int idx = 0;
     for (List<Ref<FlashDrawing>>::Element *E = current->elements.front(); E; E = E->next()) {
-        E->get()->draw(node, frame_time - current->get_index(), tr, effect);
+        Ref<FlashDrawing> elem = E->get();
+        Transform2D tr = elem->get_transform();
+        if (next.is_valid() && interpolation > 0 && next->elements.size() >= idx+1) {
+            Transform2D to = next->elements[idx]->get_transform();
+            Vector2 x = tr[0].linear_interpolate(to[0], interpolation);
+            Vector2 y = tr[1].linear_interpolate(to[1], interpolation);
+            Vector2 o = tr[2].linear_interpolate(to[2], interpolation);
+            tr = Transform2D(x.x, x.y, y.x, y.y, o.x, o.y);
+        }
+        elem->draw(node, frame_time - current->get_index(), parent_transform * tr, effect);
+        idx++;
     }
 }
 
@@ -356,6 +378,8 @@ void FlashFrame::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashFrame::set_duration);
     ClassDB::bind_method(D_METHOD("get_keymode"), &FlashFrame::get_keymode);
     ClassDB::bind_method(D_METHOD("set_keymode", "keymode"), &FlashFrame::set_keymode);
+    ClassDB::bind_method(D_METHOD("get_tween_type"), &FlashFrame::get_tween_type);
+    ClassDB::bind_method(D_METHOD("set_tween_type", "tween_type"), &FlashFrame::set_tween_type);
     ClassDB::bind_method(D_METHOD("get_elements"), &FlashFrame::get_elements);
     ClassDB::bind_method(D_METHOD("set_elements", "elements"), &FlashFrame::set_elements);
     ClassDB::bind_method(D_METHOD("get_tweens"), &FlashFrame::get_tweens);
@@ -364,6 +388,7 @@ void FlashFrame::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "keymode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_keymode", "get_keymode");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "tween_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tween_type", "get_tween_type");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "elements", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_elements", "get_elements");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "tweens", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tweens", "get_tweens");
 }
@@ -392,7 +417,7 @@ Array FlashFrame::get_tweens() {
 void FlashFrame::set_tweens(Array p_tweens) {
     tweens.clear();
     for (int i=0; i<p_tweens.size(); i++) {
-        Ref<FlashDrawing> tween = p_tweens[i];
+        Ref<FlashTween> tween = p_tweens[i];
         if (tween.is_valid()) {
             tweens.push_back(tween);
         }
@@ -411,10 +436,12 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("index")) index = xml->get_attribute_value("index").to_int();
     if (xml->has_attribute("duration")) duration = xml->get_attribute_value("duration").to_int();
     if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value("keymode");
+    if (xml->has_attribute("tweenType")) 
+        tween_type = xml->get_attribute_value("tweenType");
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMFrame" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
-            return Error::OK;
+            break;
         if (xml->get_node_name() == "DOMGroup")
             elements.push_back(add_child<FlashGroup>(xml));
         else if (xml->get_node_name() == "DOMShape")
@@ -425,6 +452,10 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
             elements.push_back(add_child<FlashBitmapInstance>(xml));
         else if (xml->get_node_name() == "CustomEase" || xml->get_node_name() == "Ease")
             tweens.push_back(add_child<FlashTween>(xml));
+    }
+    if (tween_type == "motion" && tweens.size() == 0){
+        Ref<FlashTween> linear = document->element<FlashTween>(this);
+        tweens.push_back(linear);
     }
     return Error::OK;
 }
@@ -626,7 +657,7 @@ void FlashInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashCol
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()) :
                                   first_frame + time;
     
-    tl->draw(node, instance_time, tr * transform, effect);
+    tl->draw(node, instance_time, tr, effect);
     
 }
 
@@ -649,7 +680,7 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     return Error::OK;
 }
 void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    node->draw_set_transform_matrix(tr * transform);
+    node->draw_set_transform_matrix(tr);
     Ref<Texture> tex = document->load_bitmap(library_item_name);
     node->draw_texture(tex, Vector2());
 }
@@ -680,6 +711,55 @@ Error FlashTween::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
+static _FORCE_INLINE_ Vector2 _bezier_interp(real_t t, const Vector2 &start, const Vector2 &control_1, const Vector2 &control_2, const Vector2 &end) {
+	/* Formula from Wikipedia article on Bezier curves. */
+	real_t omt = (1.0 - t);
+	real_t omt2 = omt * omt;
+	real_t omt3 = omt2 * omt;
+	real_t t2 = t * t;
+	real_t t3 = t2 * t;
+
+	return start * omt3 + control_1 * omt2 * t * 3.0 + control_2 * omt * t2 * 3.0 + end * t3;
+}
+float FlashTween::interpolate(float time) {
+    if (points.size() < 4) return time;
+    float low;
+    float high;
+    Vector2 start;
+    Vector2 start_out;
+    Vector2 end_in;
+    Vector2 end;
+
+    for (int i=0; i < (points.size()-1)/3; i++){
+        start = points[3*i];
+        start_out = points[3*i+1];
+        end_in = points[3*i+2];
+        end = points[3*i+3];
+        low = start.x;
+        high = end.x;
+        if (time < high) break;
+    }
+
+    //narrow high and low as much as possible
+    float middle;
+    for (int i = 0; i < 10; i++) {
+		middle = (low + high) / 2.0;
+		Vector2 interp = _bezier_interp(middle, start, start_out, end_in, end);
+		if (interp.x < time) {
+			low = middle;
+		} else {
+			high = middle;
+		}
+	}
+
+    //interpolate the result:
+	Vector2 low_pos = _bezier_interp(low, start, start_out, end_in, end);
+	Vector2 high_pos = _bezier_interp(high, start, start_out, end_in, end);
+	float c = (time - low_pos.x) / (high_pos.x - low_pos.x);
+
+	return low_pos.linear_interpolate(high_pos, c).y;
+}
+
 
 void ResourceFormatLoaderFlashTexture::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back("ftex");

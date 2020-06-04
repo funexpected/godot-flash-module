@@ -35,7 +35,9 @@ protected:
 
 public:
     FlashDocument *get_document() const;
+    void set_document(FlashDocument *p_document);
     FlashElement *get_parent() const;
+    void set_parent(FlashElement *parent);
     int get_eid() const { return eid; }
     void set_eid(int p_eid) { eid = p_eid; }
 
@@ -71,7 +73,7 @@ public:
     
     static void _bind_methods();
 
-    template <class T> Ref<T> element();
+    template <class T> Ref<T> element(FlashElement *parent = NULL);
 
     static Ref<FlashDocument> from_file(const String &p_path);
     Error load_file(const String &path);
@@ -199,6 +201,7 @@ class FlashFrame: public FlashElement {
     int index;
     int duration;
     String keymode;
+    String tween_type;
 
     List<Ref<FlashDrawing>> elements;
     List<Ref<FlashTween>> tweens;
@@ -207,7 +210,8 @@ public:
     FlashFrame():
         index(0),
         duration(1),
-        keymode(""){}
+        keymode(""),
+        tween_type("none"){}
 
     static void _bind_methods();
 
@@ -217,6 +221,8 @@ public:
     void set_duration(int p_duration) { duration = p_duration; }
     String get_keymode() const { return keymode; }
     void set_keymode(String p_keymode) { keymode = p_keymode; }
+    String get_tween_type() const { return tween_type; }
+    void set_tween_type(String p_tween_type) { tween_type = p_tween_type; }
     Array get_elements();
     void set_elements(Array p_elements);
     Array get_tweens();
@@ -325,6 +331,8 @@ public:
     void set_points(PoolVector2Array p_points) { points = p_points; }
   
     Error parse(Ref<XMLParser> xml);
+
+    float interpolate(float time);
 };
 
 class ResourceFormatLoaderFlashTexture: public ResourceFormatLoaderStreamTexture {
