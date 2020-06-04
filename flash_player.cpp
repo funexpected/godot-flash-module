@@ -72,7 +72,7 @@ Ref<FlashDocument> FlashPlayer::get_resource() const {
 void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_playing", "playing"), &FlashPlayer::set_playing);
     ClassDB::bind_method(D_METHOD("is_playing"), &FlashPlayer::is_playing);
-    ClassDB::bind_method(D_METHOD("set_frame_rate", "frame_rate"), &FlashPlayer::set_frame);
+    ClassDB::bind_method(D_METHOD("set_frame_rate", "frame_rate"), &FlashPlayer::set_frame_rate);
     ClassDB::bind_method(D_METHOD("get_frame_rate"), &FlashPlayer::get_frame_rate);
     ClassDB::bind_method(D_METHOD("set_frame", "frame"), &FlashPlayer::set_frame);
     ClassDB::bind_method(D_METHOD("get_frame"), &FlashPlayer::get_frame);
