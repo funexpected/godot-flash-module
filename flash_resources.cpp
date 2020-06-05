@@ -15,6 +15,17 @@ FlashElement *FlashElement::get_parent() const {
 void FlashElement::set_parent(FlashElement *p_parent) {
     parent = p_parent;
 }
+template <class T> T* FlashElement::find_parent() const {
+    FlashElement *ptr = parent;
+    while (ptr != NULL) {
+        T* obj = Object::cast_to<T>(ptr);
+        if (obj != NULL) {
+            return obj;
+        }
+        ptr = ptr->parent;
+    }
+    return NULL;
+}
 void FlashElement::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_eid"), &FlashElement::get_eid);
     ClassDB::bind_method(D_METHOD("set_eid", "path"), &FlashElement::set_eid);
@@ -67,8 +78,8 @@ void FlashDocument::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_bitmaps", "bitmaps"), &FlashDocument::set_bitmaps);
     ClassDB::bind_method(D_METHOD("get_timelines"), &FlashDocument::get_timelines);
     ClassDB::bind_method(D_METHOD("set_timelines", "timelines"), &FlashDocument::set_timelines);
+    ClassDB::bind_method(D_METHOD("get_duration"), &FlashDocument::get_duration, DEFVAL(String()), DEFVAL(String()));
     
-
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "symbols", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_symbols", "get_symbols");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "bitmaps", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_bitmaps", "get_bitmaps");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "timelines", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timelines", "get_timelines");
@@ -96,6 +107,13 @@ void FlashDocument::set_timelines(Array p_timelines) {
         }
     }
     setup(this, NULL);
+}
+float FlashDocument::get_duration(String timeline, String label) {
+    Ref<FlashTimeline> tl = get_main_timeline();
+    if (timeline != String() && symbols.has(timeline)) tl = symbols[timeline];
+    if (label == String() || !tl->get_labels().has(label)) return tl->get_duration();
+    Vector2 lb = tl->get_labels()[label];
+    return lb.y;
 }
 Ref<FlashDocument> FlashDocument::from_file(const String &p_path) {
     Ref<FlashDocument> doc; doc.instance();
@@ -219,10 +237,13 @@ Ref<Texture> FlashBitmapItem::load() {
 void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_layers"), &FlashTimeline::get_layers);
     ClassDB::bind_method(D_METHOD("set_layers", "layers"), &FlashTimeline::set_layers);
+    ClassDB::bind_method(D_METHOD("get_labels"), &FlashTimeline::get_labels);
+    ClassDB::bind_method(D_METHOD("set_labels", "labels"), &FlashTimeline::set_labels);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashTimeline::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashTimeline::set_duration);
 
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "layers", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_layers", "get_layers");
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "labels", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_labels", "get_labels");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_duration", "get_duration");
 }
 Array FlashTimeline::get_layers() {
@@ -240,6 +261,9 @@ void FlashTimeline::set_layers(Array p_layers) {
             layers.push_back(layer);
         }
     }
+}
+void FlashTimeline::add_label(String name, float start, float duration) {
+    labels[name] = Vector2(start, start+duration);
 }
 void FlashTimeline::setup(FlashDocument *p_document, FlashElement *p_parent) {
     FlashElement::setup(p_document, p_parent);
@@ -391,6 +415,10 @@ void FlashFrame::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_index", "index"), &FlashFrame::set_index);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashFrame::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashFrame::set_duration);
+    ClassDB::bind_method(D_METHOD("get_name"), &FlashFrame::get_name);
+    ClassDB::bind_method(D_METHOD("set_name", "name"), &FlashFrame::set_name);
+    ClassDB::bind_method(D_METHOD("get_label_type"), &FlashFrame::get_label_type);
+    ClassDB::bind_method(D_METHOD("set_label_type", "label_type"), &FlashFrame::set_label_type);
     ClassDB::bind_method(D_METHOD("get_keymode"), &FlashFrame::get_keymode);
     ClassDB::bind_method(D_METHOD("set_keymode", "keymode"), &FlashFrame::set_keymode);
     ClassDB::bind_method(D_METHOD("get_tween_type"), &FlashFrame::get_tween_type);
@@ -402,6 +430,8 @@ void FlashFrame::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_name", "get_name");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "label_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_label_type", "get_label_type");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "keymode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_keymode", "get_keymode");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "tween_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tween_type", "get_tween_type");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "elements", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_elements", "get_elements");
@@ -451,8 +481,9 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("index")) index = xml->get_attribute_value("index").to_int();
     if (xml->has_attribute("duration")) duration = xml->get_attribute_value("duration").to_int();
     if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value("keymode");
-    if (xml->has_attribute("tweenType")) 
-        tween_type = xml->get_attribute_value("tweenType");
+    if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value("tweenType");
+    if (xml->has_attribute("name")) name = xml->get_attribute_value("name");
+    if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value("labelType");
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMFrame" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -471,6 +502,12 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (tween_type == "motion" && tweens.size() == 0){
         Ref<FlashTween> linear = document->element<FlashTween>(this);
         tweens.push_back(linear);
+    }
+    if (name != "") {
+        FlashTimeline *tl = find_parent<FlashTimeline>();
+        if (tl != NULL) {
+            tl->add_label(name, index, duration);
+        }
     }
     return Error::OK;
 }

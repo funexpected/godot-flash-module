@@ -54,6 +54,7 @@ public:
     void set_parent(FlashElement *parent);
     int get_eid() const { return eid; }
     void set_eid(int p_eid) { eid = p_eid; }
+    template <class T> T* find_parent() const;
 
     static void _bind_methods();
     template <class T>  Ref<T> add_child(Ref<XMLParser> parser, List< Ref<T> > *elements = NULL);
@@ -99,6 +100,7 @@ public:
     void set_bitmaps(Dictionary p_bitmaps) { bitmaps = p_bitmaps; }
     Array get_timelines();
     void set_timelines(Array p_timelines);
+    float get_duration(String timeline = String(), String label = String());
     
     Ref<FlashTimeline> load_symbol(const String &symbol_name);
     Ref<Texture> load_bitmap(const String &bitmap_name);
@@ -141,6 +143,7 @@ class FlashTimeline: public FlashElement {
 
     String name;
     int duration;
+    Dictionary labels;
     List<Ref<FlashLayer>> layers;
 
 public:
@@ -153,9 +156,12 @@ public:
     String get_name() const { return name; };
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
+    Dictionary get_labels() const { return labels; }
+    void set_labels(Dictionary p_labels) { labels = p_labels; }
     Array get_layers();
     void set_layers(Array p_layers);
 
+    void add_label(String name, float start, float duration);
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
     void draw(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
@@ -214,6 +220,8 @@ class FlashFrame: public FlashElement {
 
     int index;
     int duration;
+    String name;
+    String label_type;
     String keymode;
     String tween_type;
 
@@ -224,6 +232,8 @@ public:
     FlashFrame():
         index(0),
         duration(1),
+        name(""),
+        label_type(""),
         keymode(""),
         tween_type("none"){}
 
@@ -233,6 +243,10 @@ public:
     void set_index(int p_index) { index = p_index; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
+    String get_name() const { return name; }
+    void set_name(String p_name) { name = p_name; }
+    String get_label_type() const { return label_type; }
+    void set_label_type(String p_label_type) { label_type = p_label_type; }
     String get_keymode() const { return keymode; }
     void set_keymode(String p_keymode) { keymode = p_keymode; }
     String get_tween_type() const { return tween_type; }
