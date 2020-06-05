@@ -33,15 +33,7 @@ protected:
     bool _sort_labels(Variant a, Variant b) const;
 
 public:
-    FlashPlayer(): 
-        frame(0),
-        frame_rate(24),
-        playing(false),
-        playback_start(0),
-        playback_end(0),
-        active_timeline_name("[document]"),
-        active_label(""),
-        loop(false){}
+    FlashPlayer();
 
     float get_frame() const { return frame; }
     void set_frame(float p_frame) { frame = p_frame; update(); }

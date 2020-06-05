@@ -6,6 +6,7 @@
 #include <core/resource.h>
 #include <core/io/xml_parser.h>
 #include <scene/resources/texture.h>
+#include <scene/resources/material.h>
 
 #include "flash_player.h"
 
@@ -21,13 +22,13 @@ struct FlashColorEffect {
     Color mult;
 
     FlashColorEffect() : 
-        add(Color()), 
+        add(Color(0,0,0,0)), 
         mult(Color(1,1,1,1)) {}
 
     inline FlashColorEffect interpolate(FlashColorEffect effect, float amount) {
         FlashColorEffect new_effect;
         new_effect.mult = mult.linear_interpolate(effect.mult, amount);
-        new_effect.add = mult.linear_interpolate(effect.add, amount);
+        new_effect.add = add.linear_interpolate(effect.add, amount);
         return new_effect;
     }
 
@@ -329,6 +330,10 @@ class FlashBitmapInstance: public FlashDrawing {
 
     String library_item_name;
 
+    Vector<Vector2> points;
+    Vector<Vector2> uvs;
+    Ref<Texture> texture;
+
 public:
     FlashBitmapInstance():
         library_item_name(""){}
@@ -368,6 +373,14 @@ public:
     virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual String get_resource_type(const String &p_path) const;
+};
+
+class FlashMaterial: public ShaderMaterial {
+    GDCLASS(FlashMaterial, ShaderMaterial);
+protected:
+    virtual void _validate_property(PropertyInfo &prop) const;
+public:
+    FlashMaterial();
 };
 
 

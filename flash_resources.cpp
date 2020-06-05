@@ -732,8 +732,46 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
 }
 void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
     node->draw_set_transform_matrix(tr);
+    Vector<Color> colors;
+    Color color = effect.mult * 0.5;
+    color.r += floor(effect.add.r * 255);
+    color.g += floor(effect.add.g * 255);
+    color.b += floor(effect.add.b * 255);
+    color.a += floor(effect.add.a * 255);
+    colors.push_back(color);
+    colors.push_back(color);
+    colors.push_back(color);
+    colors.push_back(color);
+    if (texture.is_valid() || points.size() > 0)
+        return node->draw_polygon(points, colors, uvs, texture);
+    
     Ref<Texture> tex = document->load_bitmap(library_item_name);
-    node->draw_texture(tex, Vector2(), effect.mult);
+    Vector2 size = tex->get_size();
+    points.push_back(Vector2());
+    points.push_back(Vector2(size.x, 0));
+    points.push_back(size);
+    points.push_back(Vector2(0, size.y));
+    AtlasTexture *at = Object::cast_to<AtlasTexture>(tex.ptr());
+    if (at != NULL) {
+        Ref<Texture> atlas = at->get_atlas();
+        Vector2 as = atlas->get_size();
+        Rect2 r = at->get_region();
+        Vector2 start = r.position / as;
+        Vector2 end = (r.position + r.size) / as;
+        uvs.push_back(start);
+        uvs.push_back(Vector2(end.x, start.y));
+        uvs.push_back(end);
+        uvs.push_back(Vector2(start.x, end.y));
+        texture = atlas;
+    } else {
+        uvs.push_back(Vector2(0,0));
+        uvs.push_back(Vector2(1,0));
+        uvs.push_back(Vector2(1,1));
+        uvs.push_back(Vector2(0,1));
+        texture = tex;
+    }
+    node->draw_polygon(points, colors, uvs, texture);
+
 }
 
 void FlashTween::_bind_methods() {
@@ -822,5 +860,24 @@ String ResourceFormatLoaderFlashTexture::get_resource_type(const String &p_path)
 	if (p_path.get_extension().to_lower() == "ftex")
 		return "Texture";
 	return "";
+}
+
+FlashMaterial::FlashMaterial() {
+    Ref<Shader> shader; shader.instance();
+    shader->set_code(
+        "shader_type canvas_item;"
+        "void fragment() {"
+        "    vec4 add;"
+        "    vec4 c = texture(TEXTURE, UV);"
+        "    vec4 mult = 2.0*modf(COLOR, add);"
+        "    COLOR = c*mult + add / 255.0;"
+        "}"
+    );
+    set_shader(shader);
+}
+void FlashMaterial::_validate_property(PropertyInfo &prop) const {
+    if (prop.name == "shader") {
+        prop.usage = PROPERTY_USAGE_NOEDITOR|PROPERTY_USAGE_INTERNAL;
+    }
 }
 #endif

@@ -80,6 +80,10 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
         }
     }
 
+    if (prop.name == "material") {
+        prop.hint_string = "FlashMaterial";
+    }
+
 }
 bool FlashPlayer::_sort_labels(Variant a, Variant b) const {
     if (!active_timeline.is_valid()) return false;
@@ -191,4 +195,17 @@ String FlashPlayer::get_active_label() const {
     return active_label == String() ? "[full]" : active_label;
 }
 
+FlashPlayer::FlashPlayer() {
+    frame = 0;
+    frame_rate = 24;
+    playing = false;
+    playback_start = 0;
+    playback_end = 0;
+    active_timeline_name = "[document]";
+    active_label = "";
+    loop = false;
+
+    Ref<FlashMaterial> material; material.instance();
+    set_material(material);
+}
 #endif
