@@ -98,13 +98,18 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         String img_path = doc->get_document_path() + "/" + item->get_bitmap_path();
         img->load(img_path);
         images.push_back(img);
-        sizes.push_back(img->get_size());
+        sizes.push_back(img->get_size() + Vector2(4,4));
     }
     Geometry::make_atlas(sizes, positions, atlas_size);
     Ref<Image> atlas; atlas.instance();
     atlas->create(atlas_size.x, atlas_size.y, false, Image::FORMAT_RGBA8);
+    if (atlas_size.x > 4096 || atlas_size.y > 4096) {
+        ERR_FAIL_V_MSG(FAILED, String("Generated atlas size ") + atlas_size + " bigger then maximum 4096x4096");
+    }
+    atlas_size = Vector2(next_power_of_2(atlas_size.x), next_power_of_2(atlas_size.y));
+    
     for (int i=0; i<images.size(); i++) {
-        atlas->blit_rect(images[i], Rect2(Vector2(), sizes[i]), positions[i]);
+        atlas->blit_rect(images[i], Rect2(Vector2(), sizes[i] - Vector2(4,4)), positions[i] + Vector2(2,2));
     }
     String atlas_path = p_save_path + ".atlas.png";
     String atlas_imported_path = p_save_path + ".atlas";
