@@ -415,8 +415,8 @@ void FlashFrame::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_index", "index"), &FlashFrame::set_index);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashFrame::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashFrame::set_duration);
-    ClassDB::bind_method(D_METHOD("get_name"), &FlashFrame::get_name);
-    ClassDB::bind_method(D_METHOD("set_name", "name"), &FlashFrame::set_name);
+    ClassDB::bind_method(D_METHOD("get_frame_name"), &FlashFrame::get_frame_name);
+    ClassDB::bind_method(D_METHOD("set_frame_name", "name"), &FlashFrame::set_frame_name);
     ClassDB::bind_method(D_METHOD("get_label_type"), &FlashFrame::get_label_type);
     ClassDB::bind_method(D_METHOD("set_label_type", "label_type"), &FlashFrame::set_label_type);
     ClassDB::bind_method(D_METHOD("get_keymode"), &FlashFrame::get_keymode);
@@ -430,7 +430,7 @@ void FlashFrame::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_name", "get_name");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "frame_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_name", "get_name");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "label_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_label_type", "get_label_type");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "keymode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_keymode", "get_keymode");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "tween_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tween_type", "get_tween_type");
@@ -482,7 +482,7 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("duration")) duration = xml->get_attribute_value("duration").to_int();
     if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value("keymode");
     if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value("tweenType");
-    if (xml->has_attribute("name")) name = xml->get_attribute_value("name");
+    if (xml->has_attribute("name")) frame_name = xml->get_attribute_value("name");
     if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value("labelType");
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -503,10 +503,10 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
         Ref<FlashTween> linear = document->element<FlashTween>(this);
         tweens.push_back(linear);
     }
-    if (name != "") {
+    if (frame_name != "") {
         FlashTimeline *tl = find_parent<FlashTimeline>();
         if (tl != NULL) {
-            tl->add_label(name, index, duration);
+            tl->add_label(frame_name, index, duration);
         }
     }
     return Error::OK;
@@ -870,14 +870,14 @@ FlashMaterial::FlashMaterial() {
         "    vec4 add;"
         "    vec4 c = texture(TEXTURE, UV);"
         "    vec4 mult = 2.0*modf(COLOR, add);"
-        "    COLOR = c*mult + add / 255.0;"
+        "    COLOR = c * mult + add / 255.0;"
         "}"
     );
     set_shader(shader);
 }
 void FlashMaterial::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "shader") {
-        prop.usage = PROPERTY_USAGE_NOEDITOR|PROPERTY_USAGE_INTERNAL;
+        prop.usage = PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
     }
 }
 #endif

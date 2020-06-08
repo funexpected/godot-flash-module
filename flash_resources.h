@@ -221,7 +221,7 @@ class FlashFrame: public FlashElement {
 
     int index;
     int duration;
-    String name;
+    String frame_name;
     String label_type;
     String keymode;
     String tween_type;
@@ -233,7 +233,7 @@ public:
     FlashFrame():
         index(0),
         duration(1),
-        name(""),
+        frame_name(""),
         label_type(""),
         keymode(""),
         tween_type("none"){}
@@ -244,8 +244,8 @@ public:
     void set_index(int p_index) { index = p_index; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
-    String get_name() const { return name; }
-    void set_name(String p_name) { name = p_name; }
+    String get_frame_name() const { return frame_name; }
+    void set_frame_name(String p_name) { frame_name = p_name; }
     String get_label_type() const { return label_type; }
     void set_label_type(String p_label_type) { label_type = p_label_type; }
     String get_keymode() const { return keymode; }

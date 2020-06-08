@@ -4,6 +4,12 @@
 
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
+        case NOTIFICATION_ENTER_TREE : {
+            if (get_material().is_null()){
+                Ref<FlashMaterial> material; material.instance();
+                set_material(material);
+            }
+        } break;
         case NOTIFICATION_READY: {
             set_process(true);
         } break;
@@ -204,8 +210,5 @@ FlashPlayer::FlashPlayer() {
     active_timeline_name = "[document]";
     active_label = "";
     loop = false;
-
-    Ref<FlashMaterial> material; material.instance();
-    set_material(material);
 }
 #endif
