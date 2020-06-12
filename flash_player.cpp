@@ -16,20 +16,28 @@ void FlashPlayer::_notification(int p_what) {
 
         case NOTIFICATION_PROCESS: {
             if (playing) {
-                float prev_frame = frame;
                 frame += get_process_delta_time()*frame_rate;
                 if (!loop && frame > playback_end)
                     frame = playback_end - 0.0001;
                 else while (frame > playback_end)
                     frame -= playback_end - playback_start;
-                if (prev_frame != frame)
-                    update();
+                batch();
             }
         } break;
 
         case NOTIFICATION_DRAW: {
             if (active_timeline.is_valid()) {
-                active_timeline->draw(this, frame);
+                VisualServer::get_singleton()->canvas_item_add_triangle_array(
+                    get_canvas_item(),
+                    indices,
+                    points,
+                    colors,
+                    uvs,
+                    Vector<int>(),
+                    Vector<float>(),
+                    resource->get_atlas()->get_rid()
+                );
+                //active_timeline->draw(this, frame);
             }
         } break;
     }
@@ -102,6 +110,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     if (doc != resource) active_timeline_name = "[document]";
     resource = doc;
     frame = 0;
+    batched_frame = -1;
     playback_start = 0;
     playback_end = 0;
     if (resource.is_valid()) {
@@ -109,6 +118,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         if (active_timeline.is_valid())
             playback_end = active_timeline->get_duration();
     }
+    batch();
     _change_notify();
 }
 
@@ -154,13 +164,13 @@ void FlashPlayer::set_active_timeline(String p_value) {
     active_timeline_name = p_value;
     active_label = "";
     frame = 0;
+    batched_frame = -1;
     playback_start = 0;
     if (resource.is_valid() && resource->get_symbols().has(active_timeline_name)) {
         active_timeline = resource->get_symbols()[active_timeline_name];
     } else if (resource.is_valid()){
         active_timeline = resource->get_main_timeline();
-    } else
-    {
+    } else {
         active_timeline_name = "";
     }
     
@@ -169,7 +179,7 @@ void FlashPlayer::set_active_timeline(String p_value) {
     } else {
         playback_end = 0;
     }
-    update();
+    batch();
     _change_notify();
 }
 String FlashPlayer::get_active_timeline() const {
@@ -201,6 +211,42 @@ String FlashPlayer::get_active_label() const {
     return active_label == String() ? "[full]" : active_label;
 }
 
+void FlashPlayer::batch() {
+    if (batched_frame == frame)
+        return;
+    batched_frame = frame;
+    indices.resize(0);
+    points.resize(0);
+    colors.resize(0);
+    uvs.resize(0);
+    
+    if (!active_timeline.is_valid()) {
+        update();
+        return;
+    }
+
+    active_timeline->batch(this, frame);
+    update();
+
+}
+void FlashPlayer::batch_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs) {
+    Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
+    for (int i=0; i<local_indices.size(); i++){
+        indices.push_back(local_indices[i] + points.size());
+    }
+    int clipping_id = 0;
+    int clipping_size = 0;
+    if (clipping_items.size() > 0) {
+        clipping_id = clipping_items.front()->get().idx;
+        clipping_size = clipping_items.size();
+    }
+    for (int i=0; i<p_points.size(); i++) {
+        points.push_back(p_points[i]);
+        colors.push_back(p_colors[i]);
+        uvs.push_back(p_uvs[i] + Vector2(clipping_id, clipping_size));
+    }
+}
+
 FlashPlayer::FlashPlayer() {
     frame = 0;
     frame_rate = 24;
@@ -210,5 +256,8 @@ FlashPlayer::FlashPlayer() {
     active_timeline_name = "[document]";
     active_label = "";
     loop = false;
+
+    batched_frame = -1;
+    cliping_depth = 0;
 }
 #endif

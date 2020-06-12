@@ -9,9 +9,16 @@
 class FlashDocument;
 class FlashTimeline;
 
+struct FlashClippingItem {
+    int idx;
+    Transform2D transform;
+    Rect2 texture_region;
+};
+
 class FlashPlayer: public Node2D {
     GDCLASS(FlashPlayer, Node2D);
 
+    // renderer part
     float frame;
     float frame_rate;
     bool playing;
@@ -22,6 +29,16 @@ class FlashPlayer: public Node2D {
     Ref<FlashTimeline> active_timeline;
     String active_label;
     bool loop;
+
+    // batcher part
+    float batched_frame;
+    int cliping_depth;
+    List<FlashClippingItem> clipping_items;
+    Vector<Vector2> points;
+    Vector<Vector2> uvs;
+    Vector<Color> colors;
+    Vector<int> indices;
+
 
 protected:
     void _notification(int p_what);
@@ -50,6 +67,18 @@ public:
     void set_active_timeline(String p_timeline);
     String get_active_label() const;
     void set_active_label(String p_label);
+
+    //batcher part
+    List<FlashClippingItem> get_clipping_items() { return clipping_items; }
+    void add_clipping_item(FlashClippingItem item) { clipping_items.push_back(item); }
+    void remove_clipping_item() { clipping_items.pop_back(); }
+    int get_clipping_depth() const { return cliping_depth; }
+    bool is_clipping() const { return cliping_depth > 0; }
+    void add_clipping_depth() { cliping_depth++; }
+    void drop_clipping_depth() { cliping_depth--; }
+
+    void batch();
+    void batch_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs);
 };
 
 

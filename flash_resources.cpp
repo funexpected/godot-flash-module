@@ -133,6 +133,18 @@ Error FlashDocument::load_file(const String &p_path) {
     ERR_FAIL_COND_V_MSG(err != Error::OK, err, "Can't parse " + p_path);
     return OK;
 }
+Ref<Texture> FlashDocument::get_atlas() {
+    if (atlas.is_valid())
+        return atlas;
+    if (!bitmaps.size()) 
+        return Ref<Texture>();
+    Ref<FlashBitmapItem> item = bitmaps.get_value_at_index(0);
+    Ref<Texture> texture = item->get_texture();
+    AtlasTexture *atlas_texture = Object::cast_to<AtlasTexture>(texture.ptr());
+    if (atlas_texture)
+        atlas = atlas_texture->get_atlas();
+    return atlas;
+}
 Ref<FlashTimeline> FlashDocument::load_symbol(const String &symbol_name) {
     if (symbols.has(symbol_name)) {
         return symbols[symbol_name];
@@ -202,9 +214,9 @@ Error FlashDocument::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashDocument::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashDocument::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
     for (List<Ref<FlashTimeline>>::Element *E = timelines.front(); E; E = E->next()) {
-        E->get()->draw(node, time, tr, effect);
+        E->get()->batch(node, time, tr, effect);
     }
 }
 
@@ -287,10 +299,15 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashTimeline::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashTimeline::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+    int clipping_size = node->get_clipping_items().size();
     for (List<Ref<FlashLayer>>::Element *E = layers.back(); E; E = E->prev()) {
-        E->get()->draw(node, time, tr, effect);
+        E->get()->batch(node, time, tr, effect);
     }
+    while (node->get_clipping_items().size() > clipping_size) {
+        node->remove_clipping_item();
+    }
+
 }
 
 void FlashLayer::_bind_methods() {
@@ -334,6 +351,8 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
         color = parse_color(xml->get_attribute_value("color"));
     if (xml->has_attribute("layerType"))
         type = xml->get_attribute_value("layerType");
+    if (xml->has_attribute("parentLayerIndex"))
+        parent_layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMLayer" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -345,8 +364,9 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 };
-void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
+void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
+    if (type == "mask") node->add_clipping_depth();
     float frame_time = time;// / document->get_frame_size();
     int frame_idx = static_cast<int>(floor(frame_time)) % duration;
     frame_time = frame_idx + frame_time - (int)frame_time;
@@ -396,9 +416,10 @@ void FlashLayer::draw(FlashPlayer* node, float time, Transform2D parent_transfor
         effect = effect.interpolate(next_effect, interpolation);
 
 
-        elem->draw(node, frame_time - current->get_index(), parent_transform * tr, parent_effect*effect);
+        elem->batch(node, frame_time - current->get_index(), parent_transform * tr, parent_effect*effect);
         idx++;
     }
+    if (type == "mask") node->drop_clipping_depth();
 }
 
 void FlashDrawing::_bind_methods() {
@@ -407,7 +428,7 @@ void FlashDrawing::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_transform", "get_transform");
 }
-void FlashDrawing::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashDrawing::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
 }
 
 void FlashFrame::_bind_methods() {
@@ -578,10 +599,10 @@ Error FlashGroup::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashGroup::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashGroup::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
     List<Ref<FlashDrawing>> ms = all_members();
     for (List<Ref<FlashDrawing>>::Element *E = ms.front(); E; E = E->next()) {
-        E->get()->draw(node, time, tr, effect);
+        E->get()->batch(node, time, tr, effect);
     }
 }
 
@@ -700,7 +721,7 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
     Ref<FlashTimeline> tl = get_timeline();
     if (!tl.is_valid()) return;
     float instance_time =
@@ -708,7 +729,7 @@ void FlashInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashCol
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
     
-    tl->draw(node, instance_time, tr, effect);
+    tl->batch(node, instance_time, tr, effect);
     
 }
 
@@ -730,8 +751,16 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    node->draw_set_transform_matrix(tr);
+void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+    // if (node->is_clipping()) {
+    //     FlashClippingItem item;
+    //     item.transform = tr;
+    //     item.texture = document->load_bitmap(library_item_name);
+    //     node->add_clipping_item(item);
+    //     return;
+    // }
+
+    //node->draw_set_transform_matrix(tr);
     Vector<Color> colors;
     Color color = effect.mult * 0.5;
     color.r += floor(effect.add.r * 255);
@@ -742,15 +771,18 @@ void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, Fl
     colors.push_back(color);
     colors.push_back(color);
     colors.push_back(color);
-    if (texture.is_valid() || points.size() > 0)
-        return node->draw_polygon(points, colors, uvs, texture);
-    
+    Vector<Vector2> points;
     Ref<Texture> tex = document->load_bitmap(library_item_name);
     Vector2 size = tex->get_size();
-    points.push_back(Vector2());
-    points.push_back(Vector2(size.x, 0));
-    points.push_back(size);
-    points.push_back(Vector2(0, size.y));
+    points.push_back(tr.xform(Vector2()));
+    points.push_back(tr.xform(Vector2(size.x, 0)));
+    points.push_back(tr.xform(size));
+    points.push_back(tr.xform(Vector2(0, size.y)));
+    
+    if (uvs.size() > 0)
+        return node->batch_polygon(points, colors, uvs);
+        //return node->draw_polygon(points, colors, uvs, texture);
+    
     AtlasTexture *at = Object::cast_to<AtlasTexture>(tex.ptr());
     if (at != NULL) {
         Ref<Texture> atlas = at->get_atlas();
@@ -770,7 +802,8 @@ void FlashBitmapInstance::draw(FlashPlayer* node, float time, Transform2D tr, Fl
         uvs.push_back(Vector2(0,1));
         texture = tex;
     }
-    node->draw_polygon(points, colors, uvs, texture);
+    node->batch_polygon(points, colors, uvs);
+    //node->draw_polygon(points, colors, uvs, texture);
 
 }
 
