@@ -9,8 +9,7 @@
 class FlashDocument;
 class FlashTimeline;
 
-struct FlashClippingItem {
-    int idx;
+struct FlashMaskItem {
     Transform2D transform;
     Rect2 texture_region;
 };
@@ -33,11 +32,17 @@ class FlashPlayer: public Node2D {
     // batcher part
     float batched_frame;
     int cliping_depth;
-    List<FlashClippingItem> clipping_items;
     Vector<Vector2> points;
     Vector<Vector2> uvs;
     Vector<Color> colors;
     Vector<int> indices;
+    
+    Ref<Image> clipping_data;
+    Ref<ImageTexture> clipping_texture;
+    HashMap<int, List<FlashMaskItem>> masks;
+    List<FlashMaskItem> clipping_cache;
+    List<FlashMaskItem> clipping_items;
+    int current_mask;
 
 
 protected:
@@ -69,16 +74,24 @@ public:
     void set_active_label(String p_label);
 
     //batcher part
-    List<FlashClippingItem> get_clipping_items() { return clipping_items; }
-    void add_clipping_item(FlashClippingItem item) { clipping_items.push_back(item); }
-    void remove_clipping_item() { clipping_items.pop_back(); }
-    int get_clipping_depth() const { return cliping_depth; }
-    bool is_clipping() const { return cliping_depth > 0; }
-    void add_clipping_depth() { cliping_depth++; }
-    void drop_clipping_depth() { cliping_depth--; }
-
     void batch();
-    void batch_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs);
+    void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs);
+    void update_clipping_data();
+    
+    void mask_begin(int layer);
+    bool is_masking();
+    void mask_add(Transform2D p_transform, Rect2i p_texture_region);
+    void mask_end(int layer);
+
+    void clip_begin(int layer);
+    void clip_end(int layer);
+
+    // void pop_clipping_item() { clipping_items.pop_back(); }
+    // int get_clipping_depth() const { return cliping_depth; }
+    // bool is_clipping() const { return cliping_depth > 0; }
+    // void add_clipping_depth() { cliping_depth++; }
+    // void drop_clipping_depth() { cliping_depth--; }
+
 };
 
 

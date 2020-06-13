@@ -148,6 +148,7 @@ class FlashTimeline: public FlashElement {
     int duration;
     Dictionary labels;
     List<Ref<FlashLayer>> layers;
+    List<Ref<FlashLayer>> masks;
 
 public:
     FlashTimeline():
@@ -164,6 +165,7 @@ public:
     Array get_layers();
     void set_layers(Array p_layers);
 
+    Ref<FlashLayer> get_layer(int idx) { return layers[idx]; }
     void add_label(String name, float start, float duration);
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
@@ -177,7 +179,7 @@ class FlashLayer: public FlashElement {
     String name;
     String type;
     int duration;
-    int parent_layer_index;
+    int mask_id;
     Color color;
     List<Ref<FlashFrame>> frames;
 
@@ -186,7 +188,7 @@ public:
         name(""),
         type(""),
         duration(0),
-        parent_layer_index(-1),
+        mask_id(0),
         color(Color()){}
 
     static void _bind_methods();
@@ -196,6 +198,8 @@ public:
     void set_type(String p_type) { type = p_type; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
+    int get_mask_id() const { return mask_id; }
+    void set_mask_id(int p_mask_id) { mask_id = p_mask_id; }
     Array get_frames();
     void set_frames(Array p_frames);
 

@@ -260,6 +260,9 @@ void FlashTimeline::_bind_methods() {
 }
 Array FlashTimeline::get_layers() {
     Array l;
+    for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
+        l.push_back(E->get());
+    }
     for (List<Ref<FlashLayer>>::Element *E = layers.front(); E; E = E->next()) {
         l.push_back(E->get());
     }
@@ -270,7 +273,10 @@ void FlashTimeline::set_layers(Array p_layers) {
     for (int i=0; i<p_layers.size(); i++) {
         Ref<FlashLayer> layer = p_layers[i];
         if (layer.is_valid()) {
-            layers.push_back(layer);
+            if (layer->get_type() == "mask") 
+                masks.push_back(layer);
+            else
+                layers.push_back(layer);
         }
     }
 }
@@ -282,6 +288,10 @@ void FlashTimeline::setup(FlashDocument *p_document, FlashElement *p_parent) {
     for (List<Ref<FlashLayer>>::Element *E = layers.front(); E; E = E->next()) {
         E->get()->setup(document, this);
     }
+    for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
+        E->get()->setup(document, this);
+    }
+
 }
 Error FlashTimeline::parse(Ref<XMLParser> xml) {
     while (xml->read() == Error::OK) {
@@ -293,21 +303,24 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
                 name = xml->get_attribute_value("name");
             }
         } else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMLayer") {
-			Ref<FlashLayer> layer = add_child<FlashLayer>(xml, &layers);
+			Ref<FlashLayer> layer = add_child<FlashLayer>(xml);
+            if (layer->get_type() == "mask") {
+                masks.push_back(layer);
+            } else {
+                layers.push_back(layer);
+            }
             if (layer->get_duration() > get_duration()) set_duration(layer->get_duration());
         }
     }
     return Error::OK;
 }
 void FlashTimeline::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    int clipping_size = node->get_clipping_items().size();
+    for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
+        E->get()->batch(node, time, tr, effect);
+    }
     for (List<Ref<FlashLayer>>::Element *E = layers.back(); E; E = E->prev()) {
         E->get()->batch(node, time, tr, effect);
     }
-    while (node->get_clipping_items().size() > clipping_size) {
-        node->remove_clipping_item();
-    }
-
 }
 
 void FlashLayer::_bind_methods() {
@@ -315,11 +328,14 @@ void FlashLayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_type", "type"), &FlashLayer::set_type);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashLayer::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashLayer::set_duration);
+    ClassDB::bind_method(D_METHOD("get_mask_id"), &FlashLayer::get_mask_id);
+    ClassDB::bind_method(D_METHOD("set_mask_id", "mask_id"), &FlashLayer::set_mask_id);
     ClassDB::bind_method(D_METHOD("get_frames"), &FlashLayer::get_frames);
     ClassDB::bind_method(D_METHOD("set_frames", "frames"), &FlashLayer::set_frames);
 
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_type", "get_type");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "mask_id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_mask_id", "get_mask_id");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "frames", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_frames", "get_frames");
 }
 Array FlashLayer::get_frames() {
@@ -351,8 +367,11 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
         color = parse_color(xml->get_attribute_value("color"));
     if (xml->has_attribute("layerType"))
         type = xml->get_attribute_value("layerType");
-    if (xml->has_attribute("parentLayerIndex"))
-        parent_layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
+    if (xml->has_attribute("parentLayerIndex")) {
+        int layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
+        FlashTimeline *tl = find_parent<FlashTimeline>();
+        mask_id = tl->get_layer(layer_index)->get_eid();
+    }
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMLayer" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -366,7 +385,9 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
 };
 void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
-    if (type == "mask") node->add_clipping_depth();
+    if (type == "mask") node->mask_begin(get_eid());
+    if (mask_id) node->clip_begin(mask_id);
+
     float frame_time = time;// / document->get_frame_size();
     int frame_idx = static_cast<int>(floor(frame_time)) % duration;
     frame_time = frame_idx + frame_time - (int)frame_time;
@@ -419,7 +440,8 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
         elem->batch(node, frame_time - current->get_index(), parent_transform * tr, parent_effect*effect);
         idx++;
     }
-    if (type == "mask") node->drop_clipping_depth();
+    if (type == "mask") node->mask_end(get_eid());
+    if (mask_id) node->clip_end(mask_id);
 }
 
 void FlashDrawing::_bind_methods() {
@@ -752,7 +774,14 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     return Error::OK;
 }
 void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    // if (node->is_clipping()) {
+    if (node->is_masking()) {
+        Ref<AtlasTexture> tex = document->load_bitmap(library_item_name);
+        if (tex.is_valid()) {
+            node->mask_add(tr, tex->get_region());
+        }
+        return;
+    }
+    // if (node->is_masking()) {
     //     FlashClippingItem item;
     //     item.transform = tr;
     //     item.texture = document->load_bitmap(library_item_name);
@@ -780,7 +809,7 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
     points.push_back(tr.xform(Vector2(0, size.y)));
     
     if (uvs.size() > 0)
-        return node->batch_polygon(points, colors, uvs);
+        return node->add_polygon(points, colors, uvs);
         //return node->draw_polygon(points, colors, uvs, texture);
     
     AtlasTexture *at = Object::cast_to<AtlasTexture>(tex.ptr());
@@ -802,7 +831,7 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
         uvs.push_back(Vector2(0,1));
         texture = tex;
     }
-    node->batch_polygon(points, colors, uvs);
+    node->add_polygon(points, colors, uvs);
     //node->draw_polygon(points, colors, uvs, texture);
 
 }
@@ -898,19 +927,70 @@ String ResourceFormatLoaderFlashTexture::get_resource_type(const String &p_path)
 FlashMaterial::FlashMaterial() {
     Ref<Shader> shader; shader.instance();
     shader->set_code(
-        "shader_type canvas_item;"
-        "void fragment() {"
-        "    vec4 add;"
-        "    vec4 c = texture(TEXTURE, UV);"
-        "    vec4 mult = 2.0*modf(COLOR, add);"
-        "    COLOR = c * mult + add / 255.0;"
-        "}"
+        "shader_type canvas_item;\n"
+        "uniform sampler2D CLIPPING_TEXTURE;\n"
+        "uniform vec2 ATLAS_SIZE;\n"
+        
+        "varying float CLIPPING_SIZE;\n"
+        "varying vec2 CLIPPING_UV_NORMAL[4];\n"
+        "varying vec2 CLIPPING_UV_REGION[4];\n"
+        "void vertex() {\n"
+        "   float clipping_size = 0.0;\n"
+        "   float clipping_id = 0.0;\n"
+        "   UV.x = 2.0 * modf(UV.x, clipping_id);\n"
+        "   UV.y = 2.0 * modf(UV.y, clipping_size);\n"
+        "   CLIPPING_SIZE = clipping_size;\n"
+        "   for (int i=0; i<int(CLIPPING_SIZE); i++) {"
+        "       int dcx = int(clipping_id*4.0) % 32;\n"
+        "       int dcy = int(clipping_id*4.0) / 32;\n"
+        "       vec4 tr_xy = texelFetch(CLIPPING_TEXTURE, ivec2(dcx, dcy), 0);\n"
+        "       vec4 tr_origin = texelFetch(CLIPPING_TEXTURE, ivec2(dcx+1, dcy), 0);\n"
+        "       vec4 tex_region = texelFetch(CLIPPING_TEXTURE, ivec2(dcx+2, dcy), 0);\n"
+        "       vec2 tex_pos = tex_region.xy;\n"
+        "       vec2 tex_size = tex_region.zw;\n"
+
+        "       mat4 tr = mat4(\n"
+        "           vec4(tr_xy.r, tr_xy.g, 0.0, 0.0),\n"
+        "           vec4(tr_xy.b, tr_xy.a, 0.0, 0.0),\n"
+        "           vec4(0.0, 0.0, 1.0, 0.0),\n"
+        "           vec4(tr_origin.r, tr_origin.g, 0.0, 1.0)\n"
+        "       );\n"
+        "       mat4 local = tr * WORLD_MATRIX * EXTRA_MATRIX;\n"
+        "       vec2 clipping_pos = (local * vec4(VERTEX, 0.0 ,1.0)).xy;\n"
+        "       CLIPPING_UV_NORMAL[i] = clipping_pos / tex_size;\n"
+        "       CLIPPING_UV_REGION[i] = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"
+        "   }\n"
+        "}\n"
+
+        "void fragment() {\n"
+        "   float masked = 1.0;\n"
+        "   if (CLIPPING_SIZE > 0.0) masked = 0.0;\n"
+        "   for (int i=0; i<int(CLIPPING_SIZE); i++) {\n"
+        "       if (CLIPPING_UV_NORMAL[i].x >= 0.0 && CLIPPING_UV_NORMAL[i].x <= 1.0 && CLIPPING_UV_NORMAL[i].y >= 0.0 && CLIPPING_UV_NORMAL[i].y <= 1.0) {\n"
+        "           vec4 mask = texture(TEXTURE, CLIPPING_UV_REGION[i]);\n"
+        "           if (mask.a >= 1.0) {\n"
+        "               masked = 1.0;\n"
+        "               break;\n"
+        "           }\n"
+        "           masked = max(masked, mask.a);\n"
+        "       }\n"
+        "   }\n"
+        "   if (masked >= 0.0) {\n"
+        "       vec4 add;\n"
+        "       vec4 c = texture(TEXTURE, UV);\n"
+        "       vec4 mult = 2.0*modf(COLOR, add);\n"
+        "       COLOR = c * mult + add / 255.0;\n"
+        "       COLOR.a = min(COLOR.a, masked);\n"
+        "   } else {\n"
+        "       COLOR = vec4(0.0);\n"
+        "   }\n"
+        "}\n"
     );
     set_shader(shader);
 }
 void FlashMaterial::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "shader") {
-        prop.usage = PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
+ //       prop.usage = PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
     }
 }
 #endif

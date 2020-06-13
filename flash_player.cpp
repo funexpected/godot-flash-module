@@ -5,10 +5,18 @@
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
         case NOTIFICATION_ENTER_TREE : {
-            if (get_material().is_null()){
-                Ref<FlashMaterial> material; material.instance();
-                set_material(material);
+            Ref<FlashMaterial> material;
+            material.instance();
+            set_material(material);
+            if (!clipping_texture.is_valid()) {
+                clipping_texture.instance();
+                clipping_data.instance();
+                clipping_data->create(32, 32, false, Image::FORMAT_RGBAF);
+                clipping_texture->create_from_image(clipping_data);
             }
+            material->set_shader_param("CLIPPING_TEXTURE", clipping_texture);
+            if (resource.is_valid())
+                material->set_shader_param("ATLAS_SIZE", resource->get_atlas()->get_size());
         } break;
         case NOTIFICATION_READY: {
             set_process(true);
@@ -22,6 +30,7 @@ void FlashPlayer::_notification(int p_what) {
                 else while (frame > playback_end)
                     frame -= playback_end - playback_start;
                 batch();
+                update_clipping_data();
             }
         } break;
 
@@ -118,6 +127,10 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         if (active_timeline.is_valid())
             playback_end = active_timeline->get_duration();
     }
+
+    Ref<FlashMaterial> material = get_material();
+    if (material.is_valid()) 
+        material->set_shader_param("ATLAS_SIZE", resource->get_atlas()->get_size());
     batch();
     _change_notify();
 }
@@ -201,10 +214,11 @@ void FlashPlayer::set_active_label(String p_value) {
             playback_end = active_timeline->get_duration();
         }
         frame = playback_start;
-        update();
     } else {
         active_label = "";
     }
+    batch();
+    update();
 }
 
 String FlashPlayer::get_active_label() const {
@@ -214,6 +228,9 @@ String FlashPlayer::get_active_label() const {
 void FlashPlayer::batch() {
     if (batched_frame == frame)
         return;
+    masks.clear();
+    clipping_cache.clear();
+    clipping_items.clear();
     batched_frame = frame;
     indices.resize(0);
     points.resize(0);
@@ -229,23 +246,87 @@ void FlashPlayer::batch() {
     update();
 
 }
-void FlashPlayer::batch_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs) {
+
+void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs) {
     Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
     for (int i=0; i<local_indices.size(); i++){
         indices.push_back(local_indices[i] + points.size());
     }
-    int clipping_id = 0;
-    int clipping_size = 0;
-    if (clipping_items.size() > 0) {
-        clipping_id = clipping_items.front()->get().idx;
-        clipping_size = clipping_items.size();
-    }
+    int clipping_id = clipping_cache.size();
+    int clipping_size = clipping_items.size();
     for (int i=0; i<p_points.size(); i++) {
         points.push_back(p_points[i]);
         colors.push_back(p_colors[i]);
-        uvs.push_back(p_uvs[i] + Vector2(clipping_id, clipping_size));
+        uvs.push_back(p_uvs[i] * 0.5 + Vector2(clipping_id, clipping_size));
     }
 }
+
+void FlashPlayer::update_clipping_data() {
+    clipping_data->lock();
+    Vector2i pos = Vector2i(0, 0);
+    Transform2D glob = get_viewport_transform() * get_global_transform_with_canvas();
+    for (List<FlashMaskItem>::Element *E = clipping_cache.front(); E; E = E->next()) {
+        FlashMaskItem item = E->get();
+        Transform2D tr = (glob * item.transform).affine_inverse();
+        Color xy = Color(tr[0].x, tr[0].y, tr[1].x, tr[1].y);
+        Color origin = Color(tr[2].x, tr[2].y, 0, 0);
+        Color region = Color(
+            item.texture_region.position.x, 
+            item.texture_region.position.y,
+            item.texture_region.size.width,
+            item.texture_region.size.height
+        );
+        clipping_data->set_pixel(pos.x, pos.y, xy);
+        clipping_data->set_pixel(pos.x+1, pos.y, origin);
+        clipping_data->set_pixel(pos.x+2, pos.y, region);
+        pos.x += 4;
+        if (pos.x >= 32) {
+            pos.x = 0;
+            pos.y += 1;
+            if (pos.y >= 32) break;
+        }
+    }
+    clipping_data->unlock();
+    clipping_texture->set_data(clipping_data);
+}
+
+void FlashPlayer::mask_begin(int mask_id) {
+    if (!current_mask) current_mask = mask_id;
+}
+void FlashPlayer::mask_end(int mask_id) {
+    if (current_mask == mask_id) current_mask = 0;
+}
+bool FlashPlayer::is_masking() {
+    return current_mask > 0;
+}
+void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region) {
+    FlashMaskItem item;
+    item.texture_region = p_texture_region;
+    item.transform = p_transform;
+    if (!masks.has(current_mask)) {
+        masks.set(current_mask, List<FlashMaskItem>());
+    }
+    masks[current_mask].push_back(item);
+}
+void FlashPlayer::clip_begin(int mask_id) {
+    ERR_FAIL_COND_MSG(!masks.has(mask_id), "No clipping mask found " + itos(mask_id));
+    for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
+        clipping_cache.push_back(E->get());
+    }
+    for (List<FlashMaskItem>::Element *E = masks[mask_id].front(); E; E = E->next()) {
+        clipping_items.push_back(E->get());
+    }
+}
+void FlashPlayer::clip_end(int mask_id) {
+    ERR_FAIL_COND_MSG(!masks.has(mask_id), "No clipping mask found " + itos(mask_id));
+    for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
+        clipping_cache.push_back(E->get());
+    }
+    for (List<FlashMaskItem>::Element *E = masks[mask_id].front(); E; E = E->next()) {
+        clipping_items.pop_back();
+    }
+}
+
 
 FlashPlayer::FlashPlayer() {
     frame = 0;
@@ -258,6 +339,7 @@ FlashPlayer::FlashPlayer() {
     loop = false;
 
     batched_frame = -1;
+    current_mask = 0;
     cliping_depth = 0;
 }
 #endif
