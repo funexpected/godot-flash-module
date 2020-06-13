@@ -932,8 +932,8 @@ FlashMaterial::FlashMaterial() {
         "uniform vec2 ATLAS_SIZE;\n"
         
         "varying float CLIPPING_SIZE;\n"
-        "varying vec2 CLIPPING_UV_NORMAL[4];\n"
-        "varying vec2 CLIPPING_UV_REGION[4];\n"
+        "varying vec2 CLIPPING_UV_NORMAL[8];\n"
+        "varying vec2 CLIPPING_UV_REGION[8];\n"
         "void vertex() {\n"
         "   float clipping_size = 0.0;\n"
         "   float clipping_id = 0.0;\n"
