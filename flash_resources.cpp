@@ -294,6 +294,7 @@ void FlashTimeline::setup(FlashDocument *p_document, FlashElement *p_parent) {
 
 }
 Error FlashTimeline::parse(Ref<XMLParser> xml) {
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMTimeline") {
@@ -372,6 +373,7 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
         FlashTimeline *tl = find_parent<FlashTimeline>();
         mask_id = tl->get_layer(layer_index)->get_eid();
     }
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMLayer" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -527,6 +529,7 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value("tweenType");
     if (xml->has_attribute("name")) frame_name = xml->get_attribute_value("name");
     if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value("labelType");
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMFrame" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -606,6 +609,7 @@ void FlashGroup::setup(FlashDocument *p_document, FlashElement *p_parent) {
     }
 }
 Error FlashGroup::parse(Ref<XMLParser> xml) {
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK){
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMGroup" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -682,6 +686,7 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
         center_point.x = xml->get_attribute_value("centerPoint3DX").to_float();
     if (xml->has_attribute("centerPoint3DY"))
         center_point.y = xml->get_attribute_value("centerPoint3DY").to_float();
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMSymbolInstance" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -764,6 +769,7 @@ void FlashBitmapInstance::_bind_methods(){
 Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     if(xml->has_attribute("libraryItemName"))
         library_item_name = xml->get_attribute_value("libraryItemName");
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMBitmapInstance" && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
@@ -849,6 +855,7 @@ Error FlashTween::parse(Ref<XMLParser> xml) {
     String n = xml->get_node_name();
     if (xml->has_attribute("target"))
         target = xml->get_attribute_value("target");
+    if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == n && (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()))
