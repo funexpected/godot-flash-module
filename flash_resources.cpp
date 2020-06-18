@@ -938,18 +938,14 @@ FlashMaterial::FlashMaterial() {
         "uniform sampler2D CLIPPING_TEXTURE;\n"
         "uniform vec2 ATLAS_SIZE;\n"
         
-        /*
-        "varying float CLIPPING_SIZE;\n"
-        "varying vec2 CLIPPING_UV_NORMAL[8];\n"
-        "varying vec2 CLIPPING_UV_REGION[8];\n"
-        */
+        "varying flat float CLIPPING_SIZE;\n"
+        "varying flat vec4 CLIPPING_UV[4];\n"
         "void vertex() {\n"
         "   float clipping_size = 0.0;\n"
         "   float clipping_id = 0.0;\n"
         "   UV.x = 2.0 * modf(UV.x, clipping_id);\n"
         "   UV.y = 2.0 * modf(UV.y, clipping_size);\n"
-        /*
-        "   CLIPPING_SIZE = clipping_size;\n"
+        "   CLIPPING_SIZE = min(clipping_size, 4.0);\n"
         "   for (int i=0; i<int(CLIPPING_SIZE); i++) {"
         "       int dcx = int(clipping_id*4.0) % 32;\n"
         "       int dcy = int(clipping_id*4.0) / 32;\n"
@@ -967,18 +963,17 @@ FlashMaterial::FlashMaterial() {
         "       );\n"
         "       mat4 local = tr * WORLD_MATRIX * EXTRA_MATRIX;\n"
         "       vec2 clipping_pos = (local * vec4(VERTEX, 0.0 ,1.0)).xy;\n"
-        "       CLIPPING_UV_NORMAL[i] = clipping_pos / tex_size;\n"
-        "       CLIPPING_UV_REGION[i] = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"
+        "       CLIPPING_UV[i].xy = clipping_pos / tex_size;\n"
+        "       CLIPPING_UV[i].zw = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"
         "   }\n"
-        */
         "}\n"
+
         "void fragment() {\n"
         "   float masked = 1.0;\n"
-        /*
         "   if (CLIPPING_SIZE > 0.0) masked = 0.0;\n"
         "   for (int i=0; i<int(CLIPPING_SIZE); i++) {\n"
-        "       if (CLIPPING_UV_NORMAL[i].x >= 0.0 && CLIPPING_UV_NORMAL[i].x <= 1.0 && CLIPPING_UV_NORMAL[i].y >= 0.0 && CLIPPING_UV_NORMAL[i].y <= 1.0) {\n"
-        "           vec4 mask = texture(TEXTURE, CLIPPING_UV_REGION[i]);\n"
+        "       if (CLIPPING_UV[i].x >= 0.0 && CLIPPING_UV[i].x <= 1.0 && CLIPPING_UV[i].y >= 0.0 && CLIPPING_UV[i].y <= 1.0) {\n"
+        "           vec4 mask = texture(TEXTURE, CLIPPING_UV[i].zw);\n"
         "           if (mask.a >= 1.0) {\n"
         "               masked = 1.0;\n"
         "               break;\n"
@@ -986,8 +981,7 @@ FlashMaterial::FlashMaterial() {
         "           masked = max(masked, mask.a);\n"
         "       }\n"
         "   }\n"
-        */
-        "   if (true || masked >= 0.0) {\n"
+        "   if (masked >= 0.0) {\n"
         "       vec4 add;\n"
         "       vec4 c = texture(TEXTURE, UV);\n"
         "       vec4 mult = 2.0*modf(COLOR, add);\n"
