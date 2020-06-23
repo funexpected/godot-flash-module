@@ -937,9 +937,8 @@ FlashMaterial::FlashMaterial() {
         "shader_type canvas_item;\n"
         "uniform sampler2D CLIPPING_TEXTURE;\n"
         "uniform vec2 ATLAS_SIZE;\n"
-        
-        "varying flat float CLIPPING_SIZE;\n"
-        "varying flat vec4 CLIPPING_UV[4];\n"
+        "varying float CLIPPING_SIZE;\n"
+        "varying vec4 CLIPPING_UV[4];\n"
         "void vertex() {\n"
         "   float clipping_size = 0.0;\n"
         "   float clipping_id = 0.0;\n"
