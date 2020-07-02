@@ -5,18 +5,15 @@
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
         case NOTIFICATION_ENTER_TREE : {
-            Ref<FlashMaterial> material;
-            material.instance();
-            set_material(material);
             if (!clipping_texture.is_valid()) {
                 clipping_texture.instance();
                 clipping_data.instance();
                 clipping_data->create(32, 32, false, Image::FORMAT_RGBAF);
                 clipping_texture->create_from_image(clipping_data);
+                VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
             }
-            material->set_shader_param("CLIPPING_TEXTURE", clipping_texture);
             if (resource.is_valid())
-                material->set_shader_param("ATLAS_SIZE", resource->get_atlas()->get_size());
+                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
         } break;
         case NOTIFICATION_READY: {
             set_process(true);
@@ -116,8 +113,8 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
         }
     }
 
-    if (prop.name == "material") {
-        prop.hint_string = "FlashMaterial";
+    if (prop.name == "material" || prop.name == "use_parent_material") {
+        prop.usage = PROPERTY_USAGE_NOEDITOR|PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
     }
 
 }
@@ -141,10 +138,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         if (active_timeline.is_valid())
             playback_end = active_timeline->get_duration();
     }
-
-    Ref<FlashMaterial> material = get_material();
-    if (material.is_valid()) 
-        material->set_shader_param("ATLAS_SIZE", resource->get_atlas()->get_size());
+    VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
     batch();
     _change_notify();
 }
@@ -356,5 +350,69 @@ FlashPlayer::FlashPlayer() {
     batched_frame = -1;
     current_mask = 0;
     cliping_depth = 0;
+
+    VisualServer *vs = VisualServer::get_singleton();
+    flash_material = vs->material_create();
+    flash_shader = vs->shader_create();
+    vs->shader_set_code(flash_shader, 
+        "shader_type canvas_item;\n"
+        "uniform sampler2D CLIPPING_TEXTURE;\n"
+        "uniform vec2 ATLAS_SIZE;\n"
+        "varying float CLIPPING_SIZE;\n"
+        "varying vec4 CLIPPING_UV[4];\n"
+        "void vertex() {\n"
+        "   float clipping_size = 0.0;\n"
+        "   float clipping_id = 0.0;\n"
+        "   UV.x = 2.0 * modf(UV.x, clipping_id);\n"
+        "   UV.y = 2.0 * modf(UV.y, clipping_size);\n"
+        "   CLIPPING_SIZE = min(clipping_size, 4.0);\n"
+        "   for (int i=0; i<int(CLIPPING_SIZE); i++) {"
+        "       int dcx = int(clipping_id*4.0) % 32;\n"
+        "       int dcy = int(clipping_id*4.0) / 32;\n"
+        "       vec4 tr_xy = texelFetch(CLIPPING_TEXTURE, ivec2(dcx, dcy), 0);\n"
+        "       vec4 tr_origin = texelFetch(CLIPPING_TEXTURE, ivec2(dcx+1, dcy), 0);\n"
+        "       vec4 tex_region = texelFetch(CLIPPING_TEXTURE, ivec2(dcx+2, dcy), 0);\n"
+        "       vec2 tex_pos = tex_region.xy;\n"
+        "       vec2 tex_size = tex_region.zw;\n"
+
+        "       mat4 tr = mat4(\n"
+        "           vec4(tr_xy.r, tr_xy.g, 0.0, 0.0),\n"
+        "           vec4(tr_xy.b, tr_xy.a, 0.0, 0.0),\n"
+        "           vec4(0.0, 0.0, 1.0, 0.0),\n"
+        "           vec4(tr_origin.r, tr_origin.g, 0.0, 1.0)\n"
+        "       );\n"
+        "       mat4 local = tr * WORLD_MATRIX * EXTRA_MATRIX;\n"
+        "       vec2 clipping_pos = (local * vec4(VERTEX, 0.0 ,1.0)).xy;\n"
+        "       CLIPPING_UV[i].xy = clipping_pos / tex_size;\n"
+        "       CLIPPING_UV[i].zw = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"
+        "   }\n"
+        "}\n"
+
+        "void fragment() {\n"
+        "   float masked = 1.0;\n"
+        "   if (CLIPPING_SIZE > 0.0) masked = 0.0;\n"
+        "   for (int i=0; i<int(CLIPPING_SIZE); i++) {\n"
+        "       if (CLIPPING_UV[i].x >= 0.0 && CLIPPING_UV[i].x <= 1.0 && CLIPPING_UV[i].y >= 0.0 && CLIPPING_UV[i].y <= 1.0) {\n"
+        "           vec4 mask = texture(TEXTURE, CLIPPING_UV[i].zw);\n"
+        "           if (mask.a >= 1.0) {\n"
+        "               masked = 1.0;\n"
+        "               break;\n"
+        "           }\n"
+        "           masked = max(masked, mask.a);\n"
+        "       }\n"
+        "   }\n"
+        "   if (masked >= 0.0) {\n"
+        "       vec4 add;\n"
+        "       vec4 c = texture(TEXTURE, UV);\n"
+        "       vec4 mult = 2.0*modf(COLOR, add);\n"
+        "       COLOR = c * mult + add / 255.0;\n"
+        "       COLOR.a = min(COLOR.a, masked);\n"
+        "   } else {\n"
+        "       COLOR = vec4(0.0);\n"
+        "   }\n"
+        "}\n"
+    );
+    vs->material_set_shader(flash_material, flash_shader);
+    vs->canvas_item_set_material(get_canvas_item(), flash_material);
 }
 #endif

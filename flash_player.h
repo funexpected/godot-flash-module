@@ -28,6 +28,8 @@ class FlashPlayer: public Node2D {
     Ref<FlashTimeline> active_timeline;
     String active_label;
     bool loop;
+    RID flash_material;
+    RID flash_shader;
 
     // batcher part
     float batched_frame;

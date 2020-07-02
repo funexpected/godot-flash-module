@@ -386,14 +386,6 @@ public:
 	virtual String get_resource_type(const String &p_path) const;
 };
 
-class FlashMaterial: public ShaderMaterial {
-    GDCLASS(FlashMaterial, ShaderMaterial);
-protected:
-    virtual void _validate_property(PropertyInfo &prop) const;
-public:
-    FlashMaterial();
-};
-
 
 
 

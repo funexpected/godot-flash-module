@@ -34,7 +34,6 @@ void register_flash_types() {
 	ClassDB::register_class<FlashShape>();
 	ClassDB::register_class<FlashBitmapInstance>();
 	ClassDB::register_class<FlashTween>();
-	ClassDB::register_class<FlashMaterial>();
 
 	resource_loader_flash_texture.instance();
 	ResourceLoader::add_resource_format_loader(resource_loader_flash_texture);
