@@ -165,7 +165,7 @@ public:
     Array get_layers();
     void set_layers(Array p_layers);
 
-    Ref<FlashLayer> get_layer(int idx) { return layers[idx]; }
+    Ref<FlashLayer> get_layer(int idx);
     void add_label(String name, float start, float duration);
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
@@ -176,6 +176,7 @@ class FlashLayer: public FlashElement {
     GDCLASS(FlashLayer, FlashElement);
     friend FlashFrame;
     
+    int index;
     String name;
     String type;
     int duration;
@@ -185,6 +186,7 @@ class FlashLayer: public FlashElement {
 
 public:
     FlashLayer():
+        index(0),
         name(""),
         type(""),
         duration(0),
@@ -193,6 +195,8 @@ public:
 
     static void _bind_methods();
 
+    int get_index() const { return index; }
+    void set_index(int p_index) { index = p_index; }
     String get_name() const;
     String get_type() const { return type; }
     void set_type(String p_type) { type = p_type; }

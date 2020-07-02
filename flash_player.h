@@ -40,6 +40,7 @@ class FlashPlayer: public Node2D {
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
     HashMap<int, List<FlashMaskItem>> masks;
+    HashMap<String, int> frame_overrides;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
     int current_mask;
@@ -59,6 +60,8 @@ public:
 
     float get_frame() const { return frame; }
     void set_frame(float p_frame) { frame = p_frame; update(); }
+    void override_frame(String p_symbol, Variant p_frame);
+    float get_symbol_frame(String p_symbol, float p_default);
     float get_frame_rate() const { return frame_rate; }
     void set_frame_rate(float p_frame_rate) { frame_rate = p_frame_rate; }
     bool is_playing() const { return playing; }

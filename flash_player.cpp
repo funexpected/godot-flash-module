@@ -51,6 +51,19 @@ void FlashPlayer::_notification(int p_what) {
         } break;
     }
 };
+void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
+    //ERR_FAIL_COND_MSG(resource.is_null(), "Can't override symbol without resource");
+    if (p_value.get_type() == Variant::NIL && frame_overrides.has(p_symbol)) {
+        frame_overrides.erase(p_symbol);
+        batch();
+    } else if (p_value.get_type() == Variant::REAL || p_value.get_type() == Variant::INT) {
+        frame_overrides[p_symbol] = p_value;
+        batch();
+    }
+}
+float FlashPlayer::get_symbol_frame(String p_symbol, float p_default) {
+    return frame_overrides.has(p_symbol) ? frame_overrides[p_symbol] : p_default;
+}
 
 // bool FlashPlayer::_set(const StringName &p_name, const Variant &p_value) {
 //     if (p_name == "active_timeline") {
@@ -122,6 +135,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     batched_frame = -1;
     playback_start = 0;
     playback_end = 0;
+    frame_overrides.clear();
     if (resource.is_valid()) {
         active_timeline = resource->get_main_timeline();
         if (active_timeline.is_valid())
@@ -140,6 +154,7 @@ Ref<FlashDocument> FlashPlayer::get_resource() const {
 }
 
 void FlashPlayer::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("override_frame", "symbol", "frame"), &FlashPlayer::override_frame);
     ClassDB::bind_method(D_METHOD("set_playing", "playing"), &FlashPlayer::set_playing);
     ClassDB::bind_method(D_METHOD("is_playing"), &FlashPlayer::is_playing);
     ClassDB::bind_method(D_METHOD("set_loop", "loop"), &FlashPlayer::set_loop);

@@ -280,6 +280,15 @@ void FlashTimeline::set_layers(Array p_layers) {
         }
     }
 }
+Ref<FlashLayer> FlashTimeline::get_layer(int index) {
+    for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
+        if (E->get()->get_index() == index) return E->get();
+    }
+    for (List<Ref<FlashLayer>>::Element *E = layers.front(); E; E = E->next()) {
+        if (E->get()->get_index() == index) return E->get();
+    }
+    return Ref<FlashLayer>();
+}
 void FlashTimeline::add_label(String name, float start, float duration) {
     labels[name] = Vector2(start, start+duration);
 }
@@ -295,6 +304,7 @@ void FlashTimeline::setup(FlashDocument *p_document, FlashElement *p_parent) {
 }
 Error FlashTimeline::parse(Ref<XMLParser> xml) {
     if (xml->is_empty()) return Error::OK;
+    int layer_index = 0;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMTimeline") {
@@ -311,6 +321,8 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
                 layers.push_back(layer);
             }
             if (layer->get_duration() > get_duration()) set_duration(layer->get_duration());
+            layer->set_index(layer_index);
+            layer_index++;
         }
     }
     return Error::OK;
@@ -325,6 +337,8 @@ void FlashTimeline::batch(FlashPlayer* node, float time, Transform2D tr, FlashCo
 }
 
 void FlashLayer::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_index"), &FlashLayer::get_index);
+    ClassDB::bind_method(D_METHOD("set_index", "index"), &FlashLayer::set_index);
     ClassDB::bind_method(D_METHOD("get_type"), &FlashLayer::get_type);
     ClassDB::bind_method(D_METHOD("set_type", "type"), &FlashLayer::set_type);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashLayer::get_duration);
@@ -334,6 +348,7 @@ void FlashLayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_frames"), &FlashLayer::get_frames);
     ClassDB::bind_method(D_METHOD("set_frames", "frames"), &FlashLayer::set_frames);
 
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_type", "get_type");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "mask_id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_mask_id", "get_mask_id");
@@ -755,6 +770,8 @@ void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashCo
         loop == "single frame"  ? first_frame :
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
+    
+    instance_time = node->get_symbol_frame(library_item_name, instance_time);
     
     tl->batch(node, instance_time, tr, effect);
     
