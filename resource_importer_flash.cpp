@@ -22,7 +22,7 @@ void ResourceImporterFlash::get_recognized_extensions(List<String> *p_extensions
 }
 
 String ResourceImporterFlash::get_save_extension() const {
-	return "tres";
+	return "res";
 }
 
 String ResourceImporterFlash::get_resource_type() const {
