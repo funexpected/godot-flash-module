@@ -11,7 +11,7 @@
 #include "resource_importer_flash.h"
 #endif
 
-static Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
+Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
 
 void register_flash_types() {
 
@@ -40,8 +40,8 @@ void register_flash_types() {
 }
 
 void unregister_flash_types() {
-
-
+	ResourceLoader::remove_resource_format_loader(resource_loader_flash_texture);
+	resource_loader_flash_texture.unref();
 }
 
 #else
