@@ -318,7 +318,7 @@ void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region) {
     masks[current_mask].push_back(item);
 }
 void FlashPlayer::clip_begin(int mask_id) {
-    ERR_FAIL_COND_MSG(!masks.has(mask_id), "No clipping mask found " + itos(mask_id));
+    if (!masks.has(mask_id)) return;
     for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
         clipping_cache.push_back(E->get());
     }
@@ -327,7 +327,7 @@ void FlashPlayer::clip_begin(int mask_id) {
     }
 }
 void FlashPlayer::clip_end(int mask_id) {
-    ERR_FAIL_COND_MSG(!masks.has(mask_id), "No clipping mask found " + itos(mask_id));
+    if (!masks.has(mask_id)) return;
     for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
         clipping_cache.push_back(E->get());
     }
