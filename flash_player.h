@@ -43,6 +43,7 @@ class FlashPlayer: public Node2D {
     Ref<ImageTexture> clipping_texture;
     HashMap<int, List<FlashMaskItem>> masks;
     HashMap<String, int> frame_overrides;
+    HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
     int current_mask;
@@ -50,9 +51,9 @@ class FlashPlayer: public Node2D {
 
 protected:
     void _notification(int p_what);
-	//bool _set(const StringName &p_name, const Variant &p_value);
-	//bool _get(const StringName &p_name, Variant &r_ret) const;
-	//void _get_property_list(List<PropertyInfo> *p_list) const;
+	bool _set(const StringName &p_name, const Variant &p_value);
+	bool _get(const StringName &p_name, Variant &r_ret) const;
+	void _get_property_list(List<PropertyInfo> *p_list) const;
     virtual void _validate_property(PropertyInfo &prop) const;
 	static void _bind_methods();
     bool _sort_labels(Variant a, Variant b) const;
@@ -63,6 +64,8 @@ public:
     float get_frame() const { return frame; }
     void set_frame(float p_frame) { frame = p_frame; update(); }
     void override_frame(String p_symbol, Variant p_frame);
+    void set_variant(String key, Variant value);
+    String get_variant(String key) const;
     float get_symbol_frame(String p_symbol, float p_default);
     float get_frame_rate() const { return frame_rate; }
     void set_frame_rate(float p_frame_rate) { frame_rate = p_frame_rate; }

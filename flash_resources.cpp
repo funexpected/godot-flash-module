@@ -79,6 +79,7 @@ void FlashDocument::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_timelines"), &FlashDocument::get_timelines);
     ClassDB::bind_method(D_METHOD("set_timelines", "timelines"), &FlashDocument::set_timelines);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashDocument::get_duration, DEFVAL(String()), DEFVAL(String()));
+    ClassDB::bind_method(D_METHOD("get_variants"), &FlashDocument::get_variants);
     
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "symbols", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_symbols", "get_symbols");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "bitmaps", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_bitmaps", "get_bitmaps");
@@ -90,6 +91,14 @@ template <class T> Ref<T> FlashDocument::element(FlashElement *parent) {
     elem->set_parent(parent);
     elem->set_document(this);
     return elem;
+}
+String FlashDocument::invalid_character = ". : @ / \" ' [ ]";
+String FlashDocument::validate_token(String token) {
+    Vector<String> chars = FlashDocument::invalid_character.split(" ");
+    for (int i = 0; i < chars.size(); i++) {
+        token = token.replace(chars[i], " ");
+    }
+    return token;
 }
 Array FlashDocument::get_timelines() {
     Array l;
@@ -114,6 +123,34 @@ float FlashDocument::get_duration(String timeline, String label) {
     if (label == String() || !tl->get_labels().has(label)) return tl->get_duration();
     Vector2 lb = tl->get_labels()[label];
     return lb.y;
+}
+Dictionary FlashDocument::get_variants() const {
+    return variants;
+}
+void FlashDocument::cache_variants() {
+    for (int i=0; i<symbols.size(); i++) {
+        Ref<FlashTimeline> timeline = symbols.get_value_at_index(i);
+        String token = timeline->get_token();
+        //print_line("check instance " + );
+        for (List<Ref<FlashLayer>>::Element *L = timeline->layers.front(); L; L = L->next()) {
+            Ref<FlashLayer> layer = L->get();
+            //print_line("layer name: " + layer->get_name());
+            for (List<Ref<FlashFrame>>::Element *F = layer->frames.front(); F; F = F->next()) {
+                Ref<FlashFrame> frame = F->get();
+
+                if (frame->label_type != String()) {
+                    Array variants_for_instance;
+                    if (variants.has(token)) {
+                        variants_for_instance = variants[token];
+                    } else {
+                        variants[token] = variants_for_instance;
+                    }
+                    variants_for_instance.push_back(frame->frame_name);
+                    //print_line("  add variant " + frame->get_frame_name());
+                }
+            }
+        }
+    }
 }
 Ref<FlashDocument> FlashDocument::from_file(const String &p_path) {
     Ref<FlashDocument> doc; doc.instance();
@@ -145,26 +182,27 @@ Ref<Texture> FlashDocument::get_atlas() {
         atlas = atlas_texture->get_atlas();
     return atlas;
 }
-Ref<FlashTimeline> FlashDocument::load_symbol(const String &symbol_name) {
-    if (symbols.has(symbol_name)) {
-        return symbols[symbol_name];
-    }
-    String symbol_path = document_path + "/LIBRARY/" + symbol_name + ".xml";
+
+FlashTimeline* FlashDocument::get_timeline(String token) {
+    Ref<FlashTimeline> tl = symbols.get(token, Variant());
+    return tl.is_valid() ? tl.ptr() : nullptr;
+}
+
+void FlashDocument::parse_timeline(const String &path) {
+    String symbol_path = document_path + "/LIBRARY/" + path;
     Ref<XMLParser> xml; xml.instance();
     Error err = xml->open(symbol_path);
+    Ref<FlashTimeline> timeline = element<FlashTimeline>();
     if (err != OK) {
-        symbols[symbol_name] = element<FlashTimeline>();
+        return;
     }
-    ERR_FAIL_COND_V_MSG(err != Error::OK, Ref<FlashDocument>(), "Can't open " + symbol_path);
+    ERR_FAIL_COND_MSG(err != Error::OK, "Can't open " + symbol_path);
     xml->set_meta("path", symbol_path);
-
-    Ref<FlashTimeline> tl = element<FlashTimeline>();
-    symbols[symbol_name] = tl;
-    tl->document = document;
-    tl->parent = NULL;
-    tl->parse(xml);
-    return tl;
+    timeline->parse(xml);
+    timeline->set_local_path(path);
+    symbols[timeline->token] = timeline;
 }
+
 Ref<Texture> FlashDocument::load_bitmap(const String &bitmap_name) {
     ERR_FAIL_COND_V_MSG(!bitmaps.has(bitmap_name), Ref<Texture>(), "No bitmap found for " + bitmap_name);
     Ref<FlashBitmapItem> item = bitmaps[bitmap_name];
@@ -191,6 +229,8 @@ void FlashDocument::setup(FlashDocument *p_document, FlashElement *p_parent) {
     for (List<Ref<FlashTimeline>>::Element *E = timelines.front(); E; E = E->next()) {
         E->get()->setup(this, this);
     }
+
+    cache_variants();
 }
 Ref<FlashTimeline> FlashDocument::get_main_timeline() {
     return timelines.front() ? timelines.front()->get() : Ref<FlashTimeline>();
@@ -209,7 +249,7 @@ Error FlashDocument::parse(Ref<XMLParser> xml) {
         }
         else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "Include" && xml->has_attribute("href")) {
             String path = xml->get_attribute_value("href");
-            load_symbol(path.get_basename());
+            parse_timeline(path);
         }
     }
     return Error::OK;
@@ -251,11 +291,17 @@ void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_layers", "layers"), &FlashTimeline::set_layers);
     ClassDB::bind_method(D_METHOD("get_labels"), &FlashTimeline::get_labels);
     ClassDB::bind_method(D_METHOD("set_labels", "labels"), &FlashTimeline::set_labels);
+    ClassDB::bind_method(D_METHOD("get_token"), &FlashTimeline::get_token);
+    ClassDB::bind_method(D_METHOD("set_token", "token"), &FlashTimeline::set_token);
+    ClassDB::bind_method(D_METHOD("get_local_path"), &FlashTimeline::get_local_path);
+    ClassDB::bind_method(D_METHOD("set_local_path", "local_path"), &FlashTimeline::set_local_path);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashTimeline::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashTimeline::set_duration);
 
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "layers", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_layers", "get_layers");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "labels", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_labels", "get_labels");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "token", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_token", "get_token");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "local_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_local_path", "get_local_path");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_duration", "get_duration");
 }
 Array FlashTimeline::get_layers() {
@@ -307,11 +353,13 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
     int layer_index = 0;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
-        if (xml->get_node_name() == "DOMTimeline") {
+        if (xml->get_node_name() == "DOMSymbolItem" && xml->get_node_type() == XMLParser::NODE_ELEMENT) {
+            token = FlashDocument::validate_token(xml->get_attribute_value("name"));
+        } else if (xml->get_node_name() == "DOMTimeline") {
             if (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()){
                 return Error::OK;
             } else {
-                name = xml->get_attribute_value("name");
+                //token = FlashDocument::validate_token(xml->get_attribute_value("name"));
             }
         } else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMLayer") {
 			Ref<FlashLayer> layer = add_child<FlashLayer>(xml);
@@ -339,6 +387,8 @@ void FlashTimeline::batch(FlashPlayer* node, float time, Transform2D tr, FlashCo
 void FlashLayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_index"), &FlashLayer::get_index);
     ClassDB::bind_method(D_METHOD("set_index", "index"), &FlashLayer::set_index);
+    ClassDB::bind_method(D_METHOD("get_layer_name"), &FlashLayer::get_layer_name);
+    ClassDB::bind_method(D_METHOD("set_layer_name", "layer_name"), &FlashLayer::set_layer_name);
     ClassDB::bind_method(D_METHOD("get_type"), &FlashLayer::get_type);
     ClassDB::bind_method(D_METHOD("set_type", "type"), &FlashLayer::set_type);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashLayer::get_duration);
@@ -349,6 +399,7 @@ void FlashLayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_frames", "frames"), &FlashLayer::set_frames);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "layer_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_layer_name", "get_layer_name");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_type", "get_type");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "mask_id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_mask_id", "get_mask_id");
@@ -378,7 +429,7 @@ void FlashLayer::setup(FlashDocument *p_document, FlashElement *p_parent) {
 }
 Error FlashLayer::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("name"))
-        name = xml->get_attribute_value("name");
+        layer_name = xml->get_attribute_value("name");
     if (xml->has_attribute("color"))
         color = parse_color(xml->get_attribute_value("color"));
     if (xml->has_attribute("layerType"))
@@ -476,7 +527,7 @@ void FlashFrame::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashFrame::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashFrame::set_duration);
     ClassDB::bind_method(D_METHOD("get_frame_name"), &FlashFrame::get_frame_name);
-    ClassDB::bind_method(D_METHOD("set_frame_name", "name"), &FlashFrame::set_frame_name);
+    ClassDB::bind_method(D_METHOD("set_frame_name", "frame_name"), &FlashFrame::set_frame_name);
     ClassDB::bind_method(D_METHOD("get_label_type"), &FlashFrame::get_label_type);
     ClassDB::bind_method(D_METHOD("set_label_type", "label_type"), &FlashFrame::set_label_type);
     ClassDB::bind_method(D_METHOD("get_keymode"), &FlashFrame::get_keymode);
@@ -490,7 +541,7 @@ void FlashFrame::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "index", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_index", "get_index");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_duration", "get_duration");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "frame_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_name", "get_name");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "frame_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_frame_name", "get_frame_name");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "label_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_label_type", "get_label_type");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "keymode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_keymode", "get_keymode");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "tween_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tween_type", "get_tween_type");
@@ -654,22 +705,22 @@ void FlashInstance::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_loop", "loop"), &FlashInstance::set_loop);
     ClassDB::bind_method(D_METHOD("get_color_effect"), &FlashInstance::get_color_effect);
     ClassDB::bind_method(D_METHOD("set_color_effect", "color_effect"), &FlashInstance::set_color_effect);
-    ClassDB::bind_method(D_METHOD("get_library_item_name"), &FlashInstance::get_library_item_name);
-    ClassDB::bind_method(D_METHOD("set_library_item_name", "library_item_name"), &FlashInstance::set_library_item_name);
-    //ClassDB::bind_method(D_METHOD("get_timeline"), &FlashInstance::get_timeline);
-    //ClassDB::bind_method(D_METHOD("set_timeline", "timeline"), &FlashInstance::set_timeline);
+    ClassDB::bind_method(D_METHOD("get_timeline_token"), &FlashInstance::get_timeline_token);
+    ClassDB::bind_method(D_METHOD("set_timeline_token", "timeline_token"), &FlashInstance::set_timeline_token);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "first_frame", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_first_frame", "get_first_frame");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "loop", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_loop", "get_loop");
     ADD_PROPERTY(PropertyInfo(Variant::POOL_COLOR_ARRAY, "color_effect", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_color_effect", "get_color_effect");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "library_item_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_library_item_name", "get_library_item_name");
-    //ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "timeline", PROPERTY_HINT_RESOURCE_TYPE, "FlashTimeline", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timeline", "get_timeline");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "timeline_token", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timeline_token", "get_timeline_token");
 }
-Ref<FlashTimeline> FlashInstance::get_timeline() {
-    return document->load_symbol(library_item_name);
-    //if (!timeline.is_valid()) 
-    //    timeline = document->load_symbol(library_item_name);
-    //return timeline;
+void FlashInstance::setup(FlashDocument *p_document, FlashElement *p_parent) {
+    FlashDrawing::setup(p_document, p_parent);
+    layer_name = find_parent<FlashLayer>()->get_layer_name();
+}
+FlashTimeline* FlashInstance::get_timeline() {
+    if (timeline != nullptr) return timeline;
+    timeline = document->get_timeline(timeline_token);
+    return timeline;
 }
 PoolColorArray FlashInstance::get_color_effect() const {
     PoolColorArray effect;
@@ -691,7 +742,7 @@ void FlashInstance::set_color_effect(PoolColorArray p_color_effect) {
 }
 Error FlashInstance::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("libraryItemName")) {
-        library_item_name = xml->get_attribute_value("libraryItemName");
+        timeline_token = FlashDocument::validate_token(xml->get_attribute_value("libraryItemName"));
     }
     if (xml->has_attribute("firstFrame"))
         first_frame = xml->get_attribute_value("firstFrame").to_int();
@@ -764,14 +815,14 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
     return Error::OK;
 }
 void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    Ref<FlashTimeline> tl = get_timeline();
-    if (!tl.is_valid()) return;
+    FlashTimeline* tl = get_timeline();
+    if (tl == NULL) return;
     float instance_time =
         loop == "single frame"  ? first_frame :
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
     
-    instance_time = node->get_symbol_frame(library_item_name, instance_time);
+    instance_time = node->get_symbol_frame(timeline_token, instance_time);
     
     tl->batch(node, instance_time, tr, effect);
     
@@ -807,7 +858,7 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
     // if (node->is_masking()) {
     //     FlashClippingItem item;
     //     item.transform = tr;
-    //     item.texture = document->load_bitmap(library_item_name);
+    //     item.texture = document->load_bitmap(timeline_token);
     //     node->add_clipping_item(item);
     //     return;
     // }

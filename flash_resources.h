@@ -81,16 +81,20 @@ class FlashDocument: public FlashElement {
     List <Ref<FlashTimeline>> timelines;
     int last_eid;
     Ref<Texture> atlas;
+    Dictionary variants;
+
+    static String invalid_character;
 
 public:
     FlashDocument(): 
+        document_path(""),
         frame_size(1.0/24.0),
-        last_eid(0),
-        document_path("") {}
-    
+        last_eid(0){}
+
     static void _bind_methods();
 
     template <class T> Ref<T> element(FlashElement *parent = NULL);
+    static String validate_token(String p_token);
 
     static Ref<FlashDocument> from_file(const String &p_path);
     Error load_file(const String &path);
@@ -104,8 +108,11 @@ public:
     Array get_timelines();
     void set_timelines(Array p_timelines);
     float get_duration(String timeline = String(), String label = String());
+    Dictionary get_variants() const;
+    void cache_variants();
     
-    Ref<FlashTimeline> load_symbol(const String &symbol_name);
+    FlashTimeline* get_timeline(String token);
+    void parse_timeline(const String &path);
     Ref<Texture> load_bitmap(const String &bitmap_name);
     inline float get_frame_size() const { return frame_size; }
     Ref<FlashTimeline> get_main_timeline();
@@ -144,7 +151,8 @@ class FlashTimeline: public FlashElement {
     GDCLASS(FlashTimeline, FlashElement);
     friend FlashDocument;
 
-    String name;
+    String token;
+    String local_path;
     int duration;
     Dictionary labels;
     List<Ref<FlashLayer>> layers;
@@ -152,12 +160,16 @@ class FlashTimeline: public FlashElement {
 
 public:
     FlashTimeline():
-        duration(0),
-        name(""){}
+
+        token(""),
+        duration(0){}
 
     static void _bind_methods();
 
-    String get_name() const { return name; };
+    String get_token() const { return token; };
+    void set_token(String p_library_name) { token = p_library_name; }
+    String get_local_path() const { return local_path; }
+    void set_local_path(String p_local_path) { local_path = p_local_path; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
     Dictionary get_labels() const { return labels; }
@@ -174,10 +186,11 @@ public:
 
 class FlashLayer: public FlashElement {
     GDCLASS(FlashLayer, FlashElement);
+    friend FlashDocument;
     friend FlashFrame;
     
     int index;
-    String name;
+    String layer_name;
     String type;
     int duration;
     int mask_id;
@@ -187,7 +200,7 @@ class FlashLayer: public FlashElement {
 public:
     FlashLayer():
         index(0),
-        name(""),
+        layer_name(""),
         type(""),
         duration(0),
         mask_id(0),
@@ -197,7 +210,8 @@ public:
 
     int get_index() const { return index; }
     void set_index(int p_index) { index = p_index; }
-    String get_name() const;
+    String get_layer_name() const { return layer_name; };
+    void set_layer_name(String p_name) { layer_name = p_name; }
     String get_type() const { return type; }
     void set_type(String p_type) { type = p_type; }
     int get_duration() const { return duration; }
@@ -229,6 +243,7 @@ public:
 
 class FlashFrame: public FlashElement {
     GDCLASS(FlashFrame, FlashElement);
+    friend FlashDocument;
     friend FlashLayer;
 
     int index;
@@ -283,9 +298,11 @@ class FlashInstance: public FlashDrawing {
     Vector2 transformation_point;
     int first_frame;
     String loop;
-    String library_item_name;
+    String timeline_token;
+    String layer_name;
 
-    Ref<FlashTimeline> timeline;
+    FlashTimeline* timeline;
+
 
 public:
     FlashColorEffect color_effect;
@@ -294,6 +311,9 @@ public:
         transformation_point(Vector2()),
         first_frame(0),
         loop("loop"),
+        timeline_token(""),
+        layer_name(""),
+        timeline(nullptr),
         color_effect(FlashColorEffect()){}
 
     static void _bind_methods();
@@ -304,10 +324,12 @@ public:
     void set_loop(String p_loop) { loop = p_loop; }
     PoolColorArray get_color_effect() const;
     void set_color_effect(PoolColorArray p_color_effect);
-    String get_library_item_name() const { return library_item_name; }
-    void set_library_item_name(String p_name) { library_item_name = p_name; }
+    String get_timeline_token() const { return timeline_token; }
+    void set_timeline_token(String p_name) { timeline_token = p_name; }
+    String get_layer_name() const { return layer_name; }
     
-    Ref<FlashTimeline> get_timeline();
+    virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
+    FlashTimeline* get_timeline();
     virtual Error parse(Ref<XMLParser> xml);
     virtual void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };

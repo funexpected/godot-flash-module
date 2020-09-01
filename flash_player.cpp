@@ -32,7 +32,7 @@ void FlashPlayer::_notification(int p_what) {
         } break;
 
         case NOTIFICATION_DRAW: {
-            if (active_timeline.is_valid()) {
+            if (active_timeline.is_valid() && points.size() > 0) {
                 VisualServer::get_singleton()->canvas_item_add_triangle_array(
                     get_canvas_item(),
                     indices,
@@ -58,43 +58,75 @@ void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
         batch();
     }
 }
+void FlashPlayer::set_variant(String variant, Variant value) {
+    if (value == Variant() || value == "[default]") {
+        if(active_variants.has(variant)) active_variants.erase(variant);
+        if (frame_overrides.has(variant)) frame_overrides.erase(variant);
+    } else {
+        active_variants[variant] = value;
+        if (!resource.is_valid()) return;
+        Ref<FlashTimeline> timeline = resource->get_symbols().get(variant, Variant());
+        if (timeline.is_valid()) {
+            Dictionary labels = timeline->get_labels();
+            Vector2 label = labels.get(value, Vector2());
+            variant = variant.replace("    ", "/");
+            frame_overrides[variant] = label.x;
+        }
+    }
+    batch();
+}
+String FlashPlayer::get_variant(String variant) const {
+    return active_variants.has(variant) ? active_variants[variant] : "[default]";
+}
 float FlashPlayer::get_symbol_frame(String p_symbol, float p_default) {
     return frame_overrides.has(p_symbol) ? frame_overrides[p_symbol] : p_default;
 }
 
-// bool FlashPlayer::_set(const StringName &p_name, const Variant &p_value) {
-//     if (p_name == "active_timeline") {
-//         set_active_timeline(p_value);
-//         return true;
-//     }
-//     else if (p_name == "active_label") {
-//         set_active_label(p_value);
-//         return true;
-//     }
-//     return false;
-// }
+bool FlashPlayer::_set(const StringName &p_name, const Variant &p_value) {
+    String n = p_name;
+    if (n.begins_with("variants/")) {
+        String variant = n.substr(strlen("variants/"));
+        set_variant(variant, p_value);
+        return true;
+    }
+    return false;
+}
 
-// bool FlashPlayer::_get(const StringName &p_name, Variant &r_ret) const { 
-//     if (p_name == "active_timeline") {
-//         r_ret = active_timeline_name;
-//         return true;
-//     } 
-//     else if (p_name == "active_label") {
-//         r_ret = active_label == String() ? "[full]" : active_label;
-//         return true;
-//     }
-//     return false;
-// }
+bool FlashPlayer::_get(const StringName &p_name, Variant &r_ret) const {
+    String n = p_name;
+    if (n.begins_with("variants/")) {
+        String variant = n.substr(strlen("variants/"));
+        r_ret = get_variant(variant);
+        return true;
+    }
+    return false;
+}
+
+void FlashPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
+    if (!resource.is_valid()) return;
+    Dictionary variants = resource->get_variants();
+    for (int i=0; i<variants.size(); i++) {
+        String key = variants.get_key_at_index(i);
+        key = key.replace("/", "    ");
+        Array options = variants[key];
+        String options_string = "[default]";
+        for (int j=0; j<options.size(); j++) {
+            String option = options[j];
+            options_string += "," + option;
+        }
+        p_list->push_back(PropertyInfo(Variant::STRING, "variants/" + key, PROPERTY_HINT_ENUM, options_string));
+    }
+}
 
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "active_timeline"){
         String symbols_hint = "[document]";
         if (resource.is_valid()) {
-            Array symbols = resource->get_symbols().keys();
+            Array symbols = resource->get_symbols().values();
             for (int i=0; i<symbols.size(); i++){
-                String symbol = symbols[i];
-                if (symbol.find("/") >= 0) continue;
-                symbols_hint += "," + symbol;
+                Ref<FlashTimeline> symbol = symbols[i];
+                if (symbol->get_local_path().find("/") >= 0) continue;
+                symbols_hint += "," + symbol->get_token();
             }
         }
         prop.hint_string = symbols_hint;
@@ -104,12 +136,21 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
         String labels_hint = "[full]";
         if (active_timeline.is_valid()) {
             Array labels = active_timeline->get_labels().keys();
+            if (labels.size() > 0) {
+                prop.usage = PROPERTY_USAGE_DEFAULT;
+            } else {
+                prop.usage = PROPERTY_USAGE_NOEDITOR;
+                return;
+            }
+
             labels.sort_custom((FlashPlayer*)this, "_sort_labels");
             for (int i=0; i<labels.size(); i++){
                 String label = labels[i];
                 labels_hint += "," + label;
             }
             prop.hint_string = labels_hint;
+        } else {
+            prop.usage = PROPERTY_USAGE_NOEDITOR;
         }
     }
 
@@ -133,6 +174,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     playback_start = 0;
     playback_end = 0;
     frame_overrides.clear();
+    active_variants.clear();
     if (resource.is_valid()) {
         active_timeline = resource->get_main_timeline();
         if (active_timeline.is_valid())
