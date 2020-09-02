@@ -179,8 +179,8 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         active_timeline = resource->get_main_timeline();
         if (active_timeline.is_valid())
             playback_end = active_timeline->get_duration();
+        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
     }
-    VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
     batch();
     _change_notify();
 }
