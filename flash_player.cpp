@@ -82,6 +82,11 @@ float FlashPlayer::get_symbol_frame(String p_symbol, float p_default) {
     return frame_overrides.has(p_symbol) ? frame_overrides[p_symbol] : p_default;
 }
 
+Dictionary FlashPlayer::get_variants() const {
+    if (!resource.is_valid()) return Dictionary();
+    return resource->get_variants();
+}
+
 bool FlashPlayer::_set(const StringName &p_name, const Variant &p_value) {
     String n = p_name;
     if (n.begins_with("variants/")) {
@@ -199,6 +204,9 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_frame_rate"), &FlashPlayer::get_frame_rate);
     ClassDB::bind_method(D_METHOD("set_frame", "frame"), &FlashPlayer::set_frame);
     ClassDB::bind_method(D_METHOD("get_frame"), &FlashPlayer::get_frame);
+    ClassDB::bind_method(D_METHOD("set_variant", "variant", "value"), &FlashPlayer::set_variant);
+    ClassDB::bind_method(D_METHOD("get_variant", "variant"), &FlashPlayer::get_variant);
+    ClassDB::bind_method(D_METHOD("get_variants"), &FlashPlayer::get_variants);
     ClassDB::bind_method(D_METHOD("set_resource", "resource"), &FlashPlayer::set_resource);
     ClassDB::bind_method(D_METHOD("get_resource"), &FlashPlayer::get_resource);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashPlayer::get_duration, DEFVAL(String()), DEFVAL(String()));
