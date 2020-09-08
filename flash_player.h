@@ -29,7 +29,7 @@ class FlashPlayer: public Node2D {
     String active_label;
     bool loop;
     RID flash_material;
-    RID flash_shader;
+    static RID flash_shader;
 
     // batcher part
     float batched_frame;
@@ -47,6 +47,7 @@ class FlashPlayer: public Node2D {
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
     int current_mask;
+
 
 
 protected:
