@@ -67,6 +67,7 @@ public:
     void override_frame(String p_symbol, Variant p_frame);
     void set_variant(String key, Variant value);
     String get_variant(String key) const;
+    Dictionary get_variants() const;
     float get_symbol_frame(String p_symbol, float p_default);
     float get_frame_rate() const { return frame_rate; }
     void set_frame_rate(float p_frame_rate) { frame_rate = p_frame_rate; }
