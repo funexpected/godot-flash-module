@@ -40,7 +40,11 @@ void FlashElement::setup(FlashDocument *p_document, FlashElement *p_parent) {
 template <class T>  Ref<T> FlashElement::add_child(Ref<XMLParser> parser, List< Ref<T> > *elements) {
     Ref<T> elem = document->element<T>(this);
     if (elements != NULL) elements->push_back(elem);
-    elem->parse(parser);
+    Error err = elem->parse(parser);
+    if (err == Error::ERR_SKIP) {
+        if (elements != NULL) elements->erase(elem);
+        elem.unref();
+    }
     return elem;
 }
 
@@ -363,6 +367,7 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
             }
         } else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMLayer") {
 			Ref<FlashLayer> layer = add_child<FlashLayer>(xml);
+            if (layer.is_null()) continue;
             if (layer->get_type() == "mask") {
                 masks.push_back(layer);
             } else {
@@ -430,15 +435,24 @@ void FlashLayer::setup(FlashDocument *p_document, FlashElement *p_parent) {
 Error FlashLayer::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("name"))
         layer_name = xml->get_attribute_value("name");
-    if (xml->has_attribute("color"))
-        color = parse_color(xml->get_attribute_value("color"));
     if (xml->has_attribute("layerType"))
         type = xml->get_attribute_value("layerType");
+    if (type == "guide") {
+        if (xml->is_empty()) return ERR_SKIP;
+        while (xml->read() == OK) {
+            if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
+            if (xml->get_node_name() == "DOMLayer" && xml->get_node_type() == XMLParser::NODE_ELEMENT_END)
+                return Error::ERR_SKIP;
+        }
+    }
+    if (xml->has_attribute("color"))
+        color = parse_color(xml->get_attribute_value("color"));
     if (xml->has_attribute("parentLayerIndex")) {
         int layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
         FlashTimeline *tl = find_parent<FlashTimeline>();
         mask_id = tl->get_layer(layer_index)->get_eid();
     }
+
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -457,8 +471,8 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
     if (mask_id) node->clip_begin(mask_id);
 
     float frame_time = time;// / document->get_frame_size();
-    int frame_idx = static_cast<int>(floor(frame_time)) % duration;
-    frame_time = frame_idx + frame_time - (int)frame_time;
+    while (frame_time > duration) frame_time -= duration;
+    int frame_idx = static_cast<int>(floor(frame_time));
     
     Ref<FlashFrame> current;
     Ref<FlashFrame> next;
@@ -625,7 +639,9 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
 }
 
 Error FlashShape::parse(Ref<XMLParser> xml) {
-    ERR_FAIL_V_MSG(FAILED, String("Vector Shape not supported at ") + xml->get_meta("path"));
+    String layer_name = find_parent<FlashLayer>()->get_layer_name();
+    int frame_idx = find_parent<FlashFrame>()->get_index();
+    ERR_FAIL_V_MSG(FAILED, String("Vector Shape not supported at ") + xml->get_meta("path") + " in layer '" + layer_name + "' at frame " + itos(frame_idx));
 }
 
 void FlashGroup::_bind_methods() {
