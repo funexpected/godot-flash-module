@@ -8,6 +8,8 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
+const String ResourceImporterFlash::importer_version = "1.0";
+
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
 }
@@ -27,6 +29,19 @@ String ResourceImporterFlash::get_save_extension() const {
 
 String ResourceImporterFlash::get_resource_type() const {
 	return "FlashDocument";
+}
+
+bool ResourceImporterFlash::are_import_settings_valid(const String &p_path) const {
+    Dictionary metadata = ResourceFormatImporter::get_singleton()->get_resource_metadata(p_path);
+    if (!metadata.has("flash_importer_version")) {
+        return false;
+    }
+    if (metadata["flash_importer_version"] != importer_version) {
+        return false;
+    }
+
+    String flash_imported_version_path = metadata["flash_imported_version_path"];
+    return FileAccess::exists(flash_imported_version_path);
 }
 
 Error ResourceImporterFlash::import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
@@ -151,8 +166,19 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         ResourceSaver::save(save_path, doc);
     }
 
-
     da->remove(tmp_dir);
+
+    if (r_metadata) {
+        String version_path = p_save_path + ".v" + importer_version + ".version";
+        FileAccess *version_file = FileAccess::open(version_path, FileAccess::WRITE);
+        Dictionary metadata;
+        metadata["flash_importer_version"] = importer_version;
+        metadata["flash_imported_version_path"] = version_path;
+        memdelete(version_file);
+        r_gen_files->push_back(version_path);
+		*r_metadata = metadata;
+	}
+
     return OK;
 }
 
