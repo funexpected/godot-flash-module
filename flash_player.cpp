@@ -34,7 +34,7 @@ void FlashPlayer::_notification(int p_what) {
         } break;
 
         case NOTIFICATION_DRAW: {
-            if (active_timeline.is_valid() && points.size() > 0) {
+            if (active_timeline.is_valid() && points.size() > 0 && resource.is_valid()) {
                 VisualServer::get_singleton()->canvas_item_add_triangle_array(
                     get_canvas_item(),
                     indices,
@@ -394,7 +394,7 @@ void FlashPlayer::clip_end(int mask_id) {
 
 FlashPlayer::FlashPlayer() {
     frame = 0;
-    frame_rate = 24;
+    frame_rate = 30;
     playing = false;
     playback_start = 0;
     playback_end = 0;

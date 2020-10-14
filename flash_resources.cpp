@@ -126,7 +126,7 @@ float FlashDocument::get_duration(String timeline, String label) {
     if (timeline != String() && symbols.has(timeline)) tl = symbols[timeline];
     if (label == String() || !tl->get_labels().has(label)) return tl->get_duration();
     Vector2 lb = tl->get_labels()[label];
-    return lb.y;
+    return lb.y - lb.x;
 }
 Dictionary FlashDocument::get_variants() const {
     return variants;
@@ -607,7 +607,7 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("duration")) duration = xml->get_attribute_value("duration").to_int();
     if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value("keymode");
     if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value("tweenType");
-    if (xml->has_attribute("name")) frame_name = xml->get_attribute_value("name");
+    if (xml->has_attribute("name")) frame_name = xml->get_attribute_value("name").strip_edges(true, true);
     if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value("labelType");
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
