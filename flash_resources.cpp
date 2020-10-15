@@ -367,7 +367,10 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
             }
         } else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMLayer") {
 			Ref<FlashLayer> layer = add_child<FlashLayer>(xml);
-            if (layer.is_null()) continue;
+            if (layer.is_null()) {
+                layer_index++;
+                continue;
+            }
             if (layer->get_type() == "mask") {
                 masks.push_back(layer);
             } else {
@@ -450,7 +453,17 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("parentLayerIndex")) {
         int layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
         FlashTimeline *tl = find_parent<FlashTimeline>();
-        mask_id = tl->get_layer(layer_index)->get_eid();
+        Ref<FlashLayer> parent_layer = tl->get_layer(layer_index);
+        if (parent_layer.is_valid()) {
+            mask_id = parent_layer->get_eid();
+        } else{
+            String msg =
+                String("Can't find layer with index ") +
+                "'" + itos(layer_index) + "'" +
+                " at " + xml->get_meta("path") +
+                " in layer '" + layer_name;
+            ERR_PRINT(msg);
+        }
     }
 
     if (xml->is_empty()) return Error::OK;
