@@ -7,7 +7,7 @@
 class ResourceImporterFlash: public ResourceImporterTexture {
     GDCLASS(ResourceImporterFlash, ResourceImporterTexture);
 
-    static const String importer_version;
+    static const int importer_version;
 
 public:
 	virtual String get_importer_name() const;
@@ -15,8 +15,8 @@ public:
 	virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual String get_save_extension() const;
 	virtual String get_resource_type() const;
+	virtual int get_importer_version() const;
 
-    virtual bool are_import_settings_valid(const String &p_path) const;
     virtual Error import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files = NULL, Variant *r_metadata = NULL);
 
 };
