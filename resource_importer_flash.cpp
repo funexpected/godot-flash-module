@@ -8,7 +8,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 2;
+const int ResourceImporterFlash::importer_version = 5;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
@@ -38,6 +38,7 @@ int ResourceImporterFlash::get_importer_version() const {
 Error ResourceImporterFlash::import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
     
     // read zip and extract it to tmp dir
+    const Vector2 PADDING(1, 1);
     FileAccess *zip_source_file;
     zlib_filefunc_def io = zipio_create_io_from_file(&zip_source_file);
     zipFile zip_source = unzOpen2(p_source_file.utf8().get_data(), &io);
@@ -103,8 +104,11 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         Ref<Image> img; img.instance();
         String img_path = doc->get_document_path() + "/" + item->get_bitmap_path();
         img->load(img_path);
+        if (img->get_format() != Image::FORMAT_RGBA8) {
+            img->convert(Image::FORMAT_RGBA8);
+        }
         images.push_back(img);
-        sizes.push_back(img->get_size() + Vector2(4,4));
+        sizes.push_back(img->get_size() + 2 * PADDING);
     }
     Geometry::make_atlas(sizes, positions, atlas_size);
     Ref<Image> atlas; atlas.instance();
@@ -115,7 +119,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     atlas_size = Vector2(next_power_of_2(atlas_size.x), next_power_of_2(atlas_size.y));
     
     for (int i=0; i<images.size(); i++) {
-        atlas->blit_rect(images[i], Rect2(Vector2(), sizes[i] - Vector2(4,4)), positions[i] + Vector2(2,2));
+        atlas->blit_rect(images[i], Rect2(Vector2(), sizes[i] - 2 * PADDING), positions[i] + PADDING);
     }
     String atlas_path = p_save_path + ".atlas.png";
     String atlas_imported_path = p_save_path + ".atlas";
@@ -149,7 +153,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         for (int i=0; i<items.size(); i++) {
             Ref<AtlasTexture> texture; texture.instance();
             texture->set_atlas(atlas_texture);
-            texture->set_region(Rect2(positions[i], sizes[i]));
+            texture->set_region(Rect2(positions[i] + PADDING, sizes[i] - 2 * PADDING));
             Ref<FlashBitmapItem> item = items[i];
             item->set_texture(texture);
         }

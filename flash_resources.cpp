@@ -84,7 +84,7 @@ void FlashDocument::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_timelines", "timelines"), &FlashDocument::set_timelines);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashDocument::get_duration, DEFVAL(String()), DEFVAL(String()));
     ClassDB::bind_method(D_METHOD("get_variants"), &FlashDocument::get_variants);
-    
+
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "symbols", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_symbols", "get_symbols");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "bitmaps", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_bitmaps", "get_bitmaps");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "timelines", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timelines", "get_timelines");
@@ -177,7 +177,7 @@ Error FlashDocument::load_file(const String &p_path) {
 Ref<Texture> FlashDocument::get_atlas() {
     if (atlas.is_valid())
         return atlas;
-    if (!bitmaps.size()) 
+    if (!bitmaps.size())
         return Ref<Texture>();
     Ref<FlashBitmapItem> item = bitmaps.get_value_at_index(0);
     Ref<Texture> texture = item->get_texture();
@@ -207,10 +207,10 @@ void FlashDocument::parse_timeline(const String &path) {
     symbols[timeline->token] = timeline;
 }
 
-Ref<Texture> FlashDocument::load_bitmap(const String &bitmap_name) {
-    ERR_FAIL_COND_V_MSG(!bitmaps.has(bitmap_name), Ref<Texture>(), "No bitmap found for " + bitmap_name);
+Ref<AtlasTexture> FlashDocument::load_bitmap(const String &bitmap_name) {
+    ERR_FAIL_COND_V_MSG(!bitmaps.has(bitmap_name), Ref<AtlasTexture>(), "No bitmap found for " + bitmap_name);
     Ref<FlashBitmapItem> item = bitmaps[bitmap_name];
-    return item->load();
+    return item->get_texture();
 }
 void FlashDocument::setup(FlashDocument *p_document, FlashElement *p_parent) {
     document = this;
@@ -279,16 +279,6 @@ Error FlashBitmapItem::parse(Ref<XMLParser> xml) {
         return Error::ERR_INVALID_DATA;
     }
 }
-Ref<Texture> FlashBitmapItem::load() {
-    if (texture.is_valid()) return texture;
-    String texture_path = document->get_document_path() + "/" + bitmap_path;
-    Ref<Image> img; img.instance();
-    ERR_FAIL_COND_V_MSG(img->load(texture_path) != Error::OK, Ref<Texture>(), "Can't load image at " + texture_path);
-    Ref<ImageTexture> tex; tex.instance();
-    tex->create_from_image(img);
-    texture = tex;
-    return texture;
-};
 
 void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_layers"), &FlashTimeline::get_layers);
@@ -323,7 +313,7 @@ void FlashTimeline::set_layers(Array p_layers) {
     for (int i=0; i<p_layers.size(); i++) {
         Ref<FlashLayer> layer = p_layers[i];
         if (layer.is_valid()) {
-            if (layer->get_type() == "mask") 
+            if (layer->get_type() == "mask")
                 masks.push_back(layer);
             else
                 layers.push_back(layer);
@@ -486,7 +476,7 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
     float frame_time = time;// / document->get_frame_size();
     while (frame_time > duration) frame_time -= duration;
     int frame_idx = static_cast<int>(floor(frame_time));
-    
+
     Ref<FlashFrame> current;
     Ref<FlashFrame> next;
     for (List<Ref<FlashFrame>>::Element *E = frames.front(); E; E = E->next()) {
@@ -498,7 +488,7 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
     }
 
     if (!current.is_valid()) return;
-    
+
     float interpolation = 0;
     float current_time = frame_time - current->get_index();
     if (current->tweens.size() > 0){
@@ -517,7 +507,7 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
         }
         FlashColorEffect next_effect = effect;
 
-        if (next.is_valid() && interpolation > 0 && next->elements.size() >= idx+1) {
+        if (next.is_valid() && next->elements.size() >= idx+1) {
             Ref<FlashDrawing> next_elem = next->elements[idx];
             Transform2D to = next_elem->get_transform();
             Vector2 x = tr[0].linear_interpolate(to[0], interpolation);
@@ -660,9 +650,9 @@ Error FlashShape::parse(Ref<XMLParser> xml) {
 void FlashGroup::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_members"), &FlashGroup::get_members);
     ClassDB::bind_method(D_METHOD("set_members", "members"), &FlashGroup::set_members);
-   
+
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "members", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_members", "get_members");
-    
+
 }
 Array FlashGroup::get_members() {
     Array l;
@@ -850,17 +840,17 @@ void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashCo
         loop == "single frame"  ? first_frame :
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
-    
+
     instance_time = node->get_symbol_frame(timeline_token, instance_time);
-    
+
     tl->batch(node, instance_time, tr, effect);
-    
+
 }
 
 void FlashBitmapInstance::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_library_item_name"), &FlashBitmapInstance::get_library_item_name);
     ClassDB::bind_method(D_METHOD("set_library_item_name", "library_item_name"), &FlashBitmapInstance::set_library_item_name);
-   
+
     ADD_PROPERTY(PropertyInfo(Variant::INT, "library_item_name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_library_item_name", "get_library_item_name");
 }
 Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
@@ -876,9 +866,17 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
+
+Ref<AtlasTexture> FlashBitmapInstance::get_texture() {
+    if (texture.is_null()) {
+        texture = document->load_bitmap(library_item_name);
+    }
+    return texture;
+}
+
 void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+    Ref<AtlasTexture> tex = get_texture();
     if (node->is_masking()) {
-        Ref<AtlasTexture> tex = document->load_bitmap(library_item_name);
         if (tex.is_valid()) {
             node->mask_add(tr, tex->get_region());
         }
@@ -904,54 +902,118 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
     colors.push_back(color);
     colors.push_back(color);
     Vector<Vector2> points;
-    Ref<Texture> tex = document->load_bitmap(library_item_name);
-    Vector2 size = tex->get_size();
+    Vector2 size = tex->get_region().size;
     points.push_back(tr.xform(Vector2()));
     points.push_back(tr.xform(Vector2(size.x, 0)));
     points.push_back(tr.xform(size));
     points.push_back(tr.xform(Vector2(0, size.y)));
-    
-    if (uvs.size() > 0)
-        return node->add_polygon(points, colors, uvs);
-        //return node->draw_polygon(points, colors, uvs, texture);
-    
-    AtlasTexture *at = Object::cast_to<AtlasTexture>(tex.ptr());
-    if (at != NULL) {
-        Ref<Texture> atlas = at->get_atlas();
+
+    if (uvs.size()  == 0) {
+        Ref<Texture> atlas = tex->get_atlas();
         Vector2 as = atlas->get_size();
-        Rect2 r = at->get_region();
+        Rect2 r = tex->get_region();
         Vector2 start = r.position / as;
         Vector2 end = (r.position + r.size) / as;
         uvs.push_back(start);
         uvs.push_back(Vector2(end.x, start.y));
         uvs.push_back(end);
         uvs.push_back(Vector2(start.x, end.y));
-        texture = atlas;
-    } else {
-        uvs.push_back(Vector2(0,0));
-        uvs.push_back(Vector2(1,0));
-        uvs.push_back(Vector2(1,1));
-        uvs.push_back(Vector2(0,1));
-        texture = tex;
     }
-    node->add_polygon(points, colors, uvs);
-    //node->draw_polygon(points, colors, uvs, texture);
 
+    node->add_polygon(points, colors, uvs);
 }
 
 void FlashTween::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_target"), &FlashTween::get_target);
     ClassDB::bind_method(D_METHOD("set_target", "target"), &FlashTween::set_target);
+    ClassDB::bind_method(D_METHOD("get_intensity"), &FlashTween::get_intensity);
+    ClassDB::bind_method(D_METHOD("set_intensity", "intensity"), &FlashTween::set_intensity);
+    ClassDB::bind_method(D_METHOD("get_method"), &FlashTween::get_method);
+    ClassDB::bind_method(D_METHOD("set_method", "method"), &FlashTween::set_method);
     ClassDB::bind_method(D_METHOD("get_points"), &FlashTween::get_points);
     ClassDB::bind_method(D_METHOD("set_points", "points"), &FlashTween::set_points);
-    
+
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "target", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_target", "get_target");
+    ADD_PROPERTY(PropertyInfo(Variant::REAL, "intensity", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_intensity", "get_intensity");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "method", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_method", "get_method");
     ADD_PROPERTY(PropertyInfo(Variant::POOL_VECTOR2_ARRAY, "points", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_points", "get_points");
+
+    BIND_ENUM_CONSTANT(NONE);
+    BIND_ENUM_CONSTANT(CLASSIC);
+    BIND_ENUM_CONSTANT(IN_QUAD);
+    BIND_ENUM_CONSTANT(OUT_QUAD);
+    BIND_ENUM_CONSTANT(INOUT_QUAD);
+    BIND_ENUM_CONSTANT(IN_CUBIC);
+    BIND_ENUM_CONSTANT(OUT_CUBIC);
+    BIND_ENUM_CONSTANT(INOUT_CUBIC);
+    BIND_ENUM_CONSTANT(IN_QUART);
+    BIND_ENUM_CONSTANT(OUT_QUART);
+    BIND_ENUM_CONSTANT(INOUT_QUART);
+    BIND_ENUM_CONSTANT(IN_QUINT);
+    BIND_ENUM_CONSTANT(OUT_QUINT);
+    BIND_ENUM_CONSTANT(INOUT_QUINT);
+    BIND_ENUM_CONSTANT(IN_SINE);
+    BIND_ENUM_CONSTANT(OUT_SINE);
+    BIND_ENUM_CONSTANT(INOUT_SINE);
+    BIND_ENUM_CONSTANT(IN_BACK);
+    BIND_ENUM_CONSTANT(OUT_BACK);
+    BIND_ENUM_CONSTANT(INOUT_BACK);
+    BIND_ENUM_CONSTANT(IN_CIRC);
+    BIND_ENUM_CONSTANT(OUT_CIRC);
+    BIND_ENUM_CONSTANT(INOUT_CIRC);
+    BIND_ENUM_CONSTANT(IN_BOUNCE);
+    BIND_ENUM_CONSTANT(OUT_BOUNCE);
+    BIND_ENUM_CONSTANT(INOUT_BOUNCE);
+    BIND_ENUM_CONSTANT(IN_ELASTIC);
+    BIND_ENUM_CONSTANT(OUT_ELASTIC);
+    BIND_ENUM_CONSTANT(INOUT_ELASTIC);
+    BIND_ENUM_CONSTANT(CUSTOM);
 }
 Error FlashTween::parse(Ref<XMLParser> xml) {
     String n = xml->get_node_name();
     if (xml->has_attribute("target"))
         target = xml->get_attribute_value("target");
+    if (xml->has_attribute("intensity")) {
+        method = CLASSIC;
+        intensity = xml->get_attribute_value("intensity").to_int();
+    }
+    if (n == "CustomEase") {
+        method = CUSTOM;
+    } else if (xml->has_attribute("method")) {
+        String mname = xml->get_attribute_value("method");
+        method =
+            mname == "quadIn"       ? IN_QUINT :
+            mname == "quadOut"      ? OUT_QUINT :
+            mname == "quadInOut"    ? INOUT_QUINT :
+            mname == "cubicIn"      ? IN_CUBIC :
+            mname == "cubicOut"     ? OUT_CUBIC :
+            mname == "cubicInOut"   ? INOUT_CUBIC :
+            mname == "quartIn"      ? IN_QUART :
+            mname == "quartOut"     ? OUT_QUART :
+            mname == "quartInOut"   ? INOUT_QUART :
+            mname == "quintIn"      ? IN_QUINT :
+            mname == "quintOut"     ? OUT_QUINT :
+            mname == "quintInOut"   ? INOUT_QUINT :
+            mname == "sineIn"       ? IN_SINE :
+            mname == "sineOut"      ? OUT_SINE :
+            mname == "sineInOut"    ? INOUT_SINE :
+            mname == "backIn"       ? IN_BACK :
+            mname == "backOut"      ? OUT_BACK :
+            mname == "backInOut"    ? INOUT_BACK :
+            mname == "circIn"       ? IN_CIRC :
+            mname == "circOut"      ? OUT_CIRC :
+            mname == "circInOut"    ? INOUT_CIRC :
+            mname == "bounceIn"     ? IN_BOUNCE :
+            mname == "bounceOut"    ? OUT_BOUNCE :
+            mname == "bounceInOut"  ? INOUT_BOUNCE :
+            mname == "elasticIn"    ? IN_ELASTIC :
+            mname == "elasticOut"   ? OUT_ELASTIC :
+            mname == "elasticInOut" ? INOUT_ELASTIC :
+                                      NONE;
+    } else {
+        method = CLASSIC;
+    }
+
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -976,45 +1038,127 @@ static _FORCE_INLINE_ Vector2 _bezier_interp(real_t t, const Vector2 &start, con
 
 	return start * omt3 + control_1 * omt2 * t * 3.0 + control_2 * omt * t2 * 3.0 + end * t3;
 }
-float FlashTween::interpolate(float time) {
-    if (points.size() < 4) return time;
-    float low;
-    float high;
-    Vector2 start;
-    Vector2 start_out;
-    Vector2 end_in;
-    Vector2 end;
 
-    for (int i=0; i < (points.size()-1)/3; i++){
-        start = points[3*i];
-        start_out = points[3*i+1];
-        end_in = points[3*i+2];
-        end = points[3*i+3];
-        low = start.x;
-        high = end.x;
-        if (time < high) break;
+inline float __ease_out_bounce(float x) {
+    const float n1 = 7.5625;
+    const float d1 = 2.75;
+    if (x < 1 / d1) {
+        return n1 * x * x;
+    } else if (x < 2 / d1) {
+        return n1 * pow(x - 1.5 / d1, 2) + 0.75;
+    } else if (x < 2.5 / d1) {
+        return n1 * pow(x - 2.25 / d1, 2) + 0.9375;
+    } else {
+        return n1 * pow(x - 2.625 / d1, 2) + 0.984375;
     }
-
-    //narrow high and low as much as possible
-    float middle;
-    for (int i = 0; i < 10; i++) {
-		middle = (low + high) / 2.0;
-		Vector2 interp = _bezier_interp(middle, start, start_out, end_in, end);
-		if (interp.x < time) {
-			low = middle;
-		} else {
-			high = middle;
-		}
-	}
-
-    //interpolate the result:
-	Vector2 low_pos = _bezier_interp(low, start, start_out, end_in, end);
-	Vector2 high_pos = _bezier_interp(high, start, start_out, end_in, end);
-	float c = (time - low_pos.x) / (high_pos.x - low_pos.x);
-
-	return low_pos.linear_interpolate(high_pos, c).y;
 }
 
+// easing calculations taken from https://easings.net/
+float FlashTween::interpolate(float time) {
+    switch (method) {
+        case NONE: return time;
+        case CLASSIC: return Math::ease(time, intensity);
+        case IN_QUAD: return time * time;
+        case OUT_QUAD: return 1 - (1 - time) * (1 - time);
+        case INOUT_QUAD: return time < 0.5 ? 2 * time * time : 1 - pow(-2 * time + 2, 2) / 2;
+        case IN_CUBIC: return time * time * time;
+        case OUT_CUBIC: return 1 - pow(1 - time, 3);
+        case INOUT_CUBIC: return time < 0.5 ? 4 * time * time * time : 1 - pow(-2 * time + 2, 3) / 2;
+        case IN_QUART: return pow(time, 4);
+        case OUT_QUART: return 1 - pow(1 - time, 4);
+        case INOUT_QUART: return time < 0.5 ? 8 * pow(time, 4) : 1 - pow(-2 * time + 2, 4) / 2;
+        case IN_QUINT: return pow(time, 5);
+        case OUT_QUINT: return 1 - pow(1 - time, 5);
+        case INOUT_QUINT: return time < 0.5 ? 16 * pow(time, 5) : 1 - pow(-2 * time + 2, 5) / 2;
+        case IN_SINE: return 1 - cos((time * M_PI) / 2);
+        case OUT_SINE: return sin((time * M_PI) / 2);
+        case INOUT_SINE: return -(cos(M_PI * time) - 1) / 2;
+        case IN_BACK: {
+            const float c1 = 1.70158;
+            const float c3 = c1 + 1;
+            return c3 * time * time * time - c1 * time * time;
+        };
+        case OUT_BACK: {
+            const float c1 = 1.70158;
+            const float c3 = c1 + 1;
+            return 1 + c3 * pow(time - 1, 3) + c1 * pow(time - 1, 2);
+        };
+        case INOUT_BACK: {
+            const float c1 = 1.70158;
+            const float c2 = c1 * 1.525;
+            return time < 0.5
+                ? (pow(2 * time, 2) * ((c2 + 1) * 2 * time - c2)) / 2
+                : (pow(2 * time - 2, 2) * ((c2 + 1) * (time * 2 - 2) + c2) + 2) / 2;
+        };
+        case IN_CIRC: return 1 - sqrt(1 - pow(time, 2));
+        case OUT_CIRC: return sqrt(1 - pow(time - 1, 2));
+        case INOUT_CIRC: return time < 0.5
+            ? (1 - sqrt(1 - pow(2 * time, 2))) / 2
+            : (sqrt(1 - pow(-2 * time + 2, 2)) + 1) / 2;
+        case IN_ELASTIC: {
+            const float c4 = (2 * M_PI) / 3;
+            return time == 0 ? 0
+                 : time == 1 ? 1
+                 : -pow(2, 10 * time - 10) * sin((time * 10 - 10.75) * c4);
+        }
+        case OUT_ELASTIC: {
+            const float c4 = (2 * M_PI) / 3;
+            return time == 0 ? 0
+                 : time == 1 ? 1
+                 : pow(2, -10 * time) * sin((time * 10 - 0.75) * c4) + 1;
+        };
+        case INOUT_ELASTIC: {
+            const float c5 = (2 * M_PI) / 4.5;
+            return time == 0 ? 0
+                 : time == 1 ? 1
+                 : time < 0.5
+                 ? -(pow(2, 20 * time - 10) * sin((20 * time - 11.125) * c5)) / 2
+                 : (pow(2, -20 * time + 10) * sin((20 * time - 11.125) * c5)) / 2 + 1;
+        };                                   \
+        case IN_BOUNCE: return 1 - __ease_out_bounce(1 - time);
+        case OUT_BOUNCE: return __ease_out_bounce(time);
+        case INOUT_BOUNCE: return time < 0.5
+            ? (1 - __ease_out_bounce(1 - 2 * time)) / 2
+            : (1 + __ease_out_bounce(2 * time - 1)) / 2;
+        case CUSTOM: {
+            if (points.size() < 4) return time;
+            float low = 0;
+            float high = 1;
+            Vector2 start;
+            Vector2 start_out;
+            Vector2 end_in;
+            Vector2 end;
+
+            for (int i=0; i < (points.size()-1)/3; i++){
+                start = points[3*i];
+                start_out = points[3*i+1];
+                end_in = points[3*i+2];
+                end = points[3*i+3];
+                if (time < end.x) break;
+            }
+            //time = time - low;
+            //narrow high and low as much as possible
+            float middle;
+            for (int i = 0; i < 10; i++) {
+                middle = (low + high) / 2.0;
+                Vector2 interp = _bezier_interp(middle, start, start_out, end_in, end);
+                if (interp.x < time) {
+                    low = middle;
+                } else {
+                    high = middle;
+                }
+            }
+
+            //interpolate the result:
+            Vector2 low_pos = _bezier_interp(low, start, start_out, end_in, end);
+            Vector2 high_pos = _bezier_interp(high, start, start_out, end_in, end);
+
+            float c = (time - low_pos.x) / (high_pos.x - low_pos.x);
+
+            return low_pos.linear_interpolate(high_pos, c).y;
+        }
+    }
+}
 
 void ResourceFormatLoaderFlashTexture::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back("ftex");

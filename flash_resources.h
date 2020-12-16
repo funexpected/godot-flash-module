@@ -113,7 +113,7 @@ public:
     
     FlashTimeline* get_timeline(String token);
     void parse_timeline(const String &path);
-    Ref<Texture> load_bitmap(const String &bitmap_name);
+    Ref<AtlasTexture> load_bitmap(const String &bitmap_name);
     inline float get_frame_size() const { return frame_size; }
     Ref<FlashTimeline> get_main_timeline();
 
@@ -128,7 +128,7 @@ class FlashBitmapItem: public FlashElement {
     GDCLASS(FlashBitmapItem, FlashElement);
     String name;
     String bitmap_path;
-    Ref<Texture> texture;
+    Ref<AtlasTexture> texture;
 public:
     FlashBitmapItem():
         name(""), 
@@ -138,8 +138,7 @@ public:
     
     String get_name() const { return name; };
     String get_bitmap_path() const { return bitmap_path; };
-    Ref<Texture> load();
-    Ref<Texture> get_texture() const { return texture; };
+    Ref<AtlasTexture> get_texture() const { return texture; };
     void set_texture(Ref<Texture> p_texture) { texture = p_texture; };
 
     virtual Error parse(Ref<XMLParser> xml);
@@ -365,7 +364,7 @@ class FlashBitmapInstance: public FlashDrawing {
     String library_item_name;
 
     Vector<Vector2> uvs;
-    Ref<Texture> texture;
+    Ref<AtlasTexture> texture;
 
 public:
     FlashBitmapInstance():
@@ -373,6 +372,7 @@ public:
 
     static void _bind_methods();
 
+    Ref<AtlasTexture> get_texture();
     String get_library_item_name() const { return library_item_name; }
     void set_library_item_name(String p_library_item_name) { library_item_name = p_library_item_name; }
 
@@ -382,17 +382,43 @@ public:
 
 class FlashTween: public FlashElement {
     GDCLASS(FlashTween, FlashElement);
+public:
+    enum Method {
+        NONE,
+        CLASSIC,
+        IN_QUAD,        OUT_QUAD,         INOUT_QUAD,
+        IN_CUBIC,       OUT_CUBIC,        INOUT_CUBIC,
+        IN_QUART,       OUT_QUART,        INOUT_QUART,
+        IN_QUINT,       OUT_QUINT,        INOUT_QUINT,
+        IN_SINE,        OUT_SINE,         INOUT_SINE,
+        IN_BACK,        OUT_BACK,         INOUT_BACK,
+        IN_CIRC,        OUT_CIRC,         INOUT_CIRC,
+        IN_BOUNCE,      OUT_BOUNCE,       INOUT_BOUNCE,
+        IN_ELASTIC,     OUT_ELASTIC,      INOUT_ELASTIC,
+        CUSTOM
+    };
 
+private:
     String target;
     PoolVector2Array points;
+    Method method;
+    float intensity;
 
 public:
+
+
     FlashTween():
-        target("all"){}
+        target("all"),
+        method(NONE),
+        intensity(0){}
 
     static void _bind_methods();
     String get_target() const { return target; }
     void set_target(String p_target) { target = p_target; }
+    Method get_method() const { return method; }
+    void set_method(Method p_method) { method = p_method; }
+    float get_intensity() const { return intensity; }
+    void set_intensity(float p_intesity) { intensity = p_intesity; }
     PoolVector2Array get_points() const { return points; }
     void set_points(PoolVector2Array p_points) { points = p_points; }
   
@@ -400,6 +426,8 @@ public:
 
     float interpolate(float time);
 };
+
+VARIANT_ENUM_CAST(FlashTween::Method);
 
 class ResourceFormatLoaderFlashTexture: public ResourceFormatLoaderStreamTexture {
 public:
