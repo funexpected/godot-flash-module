@@ -10,7 +10,7 @@ void FlashPlayer::_notification(int p_what) {
             if (!clipping_texture.is_valid()) {
                 clipping_texture.instance();
                 clipping_data.instance();
-                clipping_data->create(32, 32, false, Image::FORMAT_RGBAF);
+                clipping_data->create(32, 32, false, Image::FORMAT_RGBAH);
                 clipping_texture->create_from_image(clipping_data);
                 VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
             }
