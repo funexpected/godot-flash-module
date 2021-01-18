@@ -444,15 +444,8 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
         int layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
         FlashTimeline *tl = find_parent<FlashTimeline>();
         Ref<FlashLayer> parent_layer = tl->get_layer(layer_index);
-        if (parent_layer.is_valid()) {
+        if (parent_layer.is_valid() && parent_layer->type == "mask") {
             mask_id = parent_layer->get_eid();
-        } else{
-            String msg =
-                String("Can't find layer with index ") +
-                "'" + itos(layer_index) + "'" +
-                " at " + xml->get_meta("path") +
-                " in layer '" + layer_name;
-            ERR_PRINT(msg);
         }
     }
 
@@ -470,11 +463,12 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
 };
 void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
+    if (type == "folder") return;
     if (type == "mask") node->mask_begin(get_eid());
     if (mask_id) node->clip_begin(mask_id);
 
     float frame_time = time;// / document->get_frame_size();
-    while (frame_time > duration) frame_time -= duration;
+    while (duration > 0 && frame_time > duration) frame_time -= duration;
     int frame_idx = static_cast<int>(floor(frame_time));
 
     Ref<FlashFrame> current;
@@ -787,7 +781,9 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
         if (xml->get_node_name() == "Color") {
             if (xml->has_attribute("tintColor")) {
                 Color tint = parse_color(xml->get_attribute_value("tintColor"));
-                float amount = xml->get_attribute_value("tintMultiplier").to_float();
+                float amount = xml->has_attribute("tintMultiplier") ?
+                    xml->get_attribute_value("tintMultiplier").to_float() : 0.0;
+
                 color_effect.add.r = tint.r * amount;
                 color_effect.add.g = tint.g * amount;
                 color_effect.add.b = tint.b * amount;
