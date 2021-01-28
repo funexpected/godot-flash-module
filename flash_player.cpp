@@ -29,12 +29,12 @@ void FlashPlayer::_notification(int p_what) {
                 else while (frame > playback_end)
                     frame -= playback_end - playback_start;
                 batch();
-                update_clipping_data();
             }
         } break;
 
         case NOTIFICATION_DRAW: {
             if (active_timeline.is_valid() && points.size() > 0 && resource.is_valid()) {
+                update_clipping_data();
                 VisualServer::get_singleton()->canvas_item_add_triangle_array(
                     get_canvas_item(),
                     indices,
