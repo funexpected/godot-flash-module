@@ -22,6 +22,7 @@ void FlashPlayer::_notification(int p_what) {
         } break;
 
         case NOTIFICATION_PROCESS: {
+            performance_triangles_generated = 0;
             if (playing) {
                 frame += get_process_delta_time()*frame_rate;
                 if (!loop && frame > playback_end)
@@ -35,18 +36,27 @@ void FlashPlayer::_notification(int p_what) {
         case NOTIFICATION_DRAW: {
             if (active_timeline.is_valid() && points.size() > 0 && resource.is_valid()) {
                 update_clipping_data();
-                VisualServer::get_singleton()->canvas_item_add_triangle_array(
-                    get_canvas_item(),
-                    indices,
-                    points,
-                    colors,
-                    uvs,
-                    Vector<int>(),
-                    Vector<float>(),
-                    resource->get_atlas()->get_rid()
+                VisualServer::get_singleton()->mesh_clear(mesh);
+                Array arrays;
+                arrays.resize(Mesh::ARRAY_MAX);
+                arrays[Mesh::ARRAY_VERTEX] = points;
+                arrays[Mesh::ARRAY_INDEX] = indices;
+                arrays[Mesh::ARRAY_COLOR] = colors;
+                arrays[Mesh::ARRAY_TEX_UV] = uvs;
+                VisualServer::get_singleton()->mesh_add_surface_from_arrays(
+                    mesh,
+                    VisualServer::PRIMITIVE_TRIANGLES,
+                    arrays, Array(),
+                    VisualServer::ARRAY_FLAG_USE_2D_VERTICES
                 );
-                //active_timeline->draw(this, frame);
+                VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh, Transform2D(), Color(1,1,1), resource->get_atlas()->get_rid());
+                performance_triangles_drawn = indices.size() / 3;
             }
+        } break;
+
+        case NOTIFICATION_VISIBILITY_CHANGED: {
+            performance_triangles_drawn = 0;
+            performance_triangles_generated = 0;
         } break;
     }
 };
@@ -105,7 +115,13 @@ bool FlashPlayer::_get(const StringName &p_name, Variant &r_ret) const {
         String variant = n.substr(strlen("variants/"));
         r_ret = get_variant(variant);
         return true;
-    }
+    } else if (p_name == "performance/triangles_drawn") {
+		r_ret = performance_triangles_drawn;
+        return true;
+	} else if (p_name == "performance/triangles_generated") {
+		r_ret = performance_triangles_generated;
+        return true;
+	}
     return false;
 }
 
@@ -305,6 +321,7 @@ void FlashPlayer::batch() {
 
     active_timeline->batch(this, frame);
     update();
+    performance_triangles_generated = indices.size() / 3;
 
 }
 
@@ -391,6 +408,11 @@ void FlashPlayer::clip_end(int mask_id) {
     }
 }
 
+FlashPlayer::~FlashPlayer() {
+    VisualServer *vs = VisualServer::get_singleton();
+    vs->free(flash_material);
+    vs->free(mesh);
+}
 
 FlashPlayer::FlashPlayer() {
     frame = 0;
@@ -406,8 +428,12 @@ FlashPlayer::FlashPlayer() {
     current_mask = 0;
     cliping_depth = 0;
 
+    performance_triangles_generated = 0;
+    performance_triangles_drawn = 0;
+
     VisualServer *vs = VisualServer::get_singleton();
     flash_material = vs->material_create();
+    mesh = vs->mesh_create();
     if (flash_shader == RID()) {
         print_line("creating new shader");
         flash_shader = vs->shader_create();

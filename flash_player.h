@@ -29,6 +29,7 @@ class FlashPlayer: public Node2D {
     String active_label;
     bool loop;
     RID flash_material;
+    RID mesh;
     static RID flash_shader;
 
     // batcher part
@@ -48,6 +49,9 @@ class FlashPlayer: public Node2D {
     List<FlashMaskItem> clipping_items;
     int current_mask;
 
+    int performance_triangles_drawn;
+	int performance_triangles_generated;
+
 
 
 protected:
@@ -61,6 +65,7 @@ protected:
 
 public:
     FlashPlayer();
+    ~FlashPlayer();
 
     float get_frame() const { return frame; }
     void set_frame(float p_frame) { frame = p_frame; update(); }
