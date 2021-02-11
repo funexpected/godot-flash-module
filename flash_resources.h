@@ -139,7 +139,7 @@ public:
     String get_name() const { return name; };
     String get_bitmap_path() const { return bitmap_path; };
     Ref<AtlasTexture> get_texture() const { return texture; };
-    void set_texture(Ref<Texture> p_texture) { texture = p_texture; };
+    void set_texture(Ref<AtlasTexture> p_texture) { texture = p_texture; };
 
     virtual Error parse(Ref<XMLParser> xml);
 
