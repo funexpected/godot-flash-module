@@ -71,6 +71,33 @@ public:
     virtual Error parse(Ref<XMLParser> parser);
 };
 
+class FlashTextureRect: public Resource {
+    GDCLASS(FlashTextureRect, Resource);
+
+    int index;
+    Rect2 region;
+    Rect2 margin;
+    Vector2 original_size;
+
+    static void _bind_methods();
+
+public:
+    FlashTextureRect():
+        index(0),
+        region(Rect2()),
+        margin(Rect2()),
+        original_size(Vector2()){}
+
+	void set_index(const int p_index) { index = p_index; }
+	int get_index() const { return index; }
+    void set_region(const Rect2 &p_region) { region = p_region; }
+	Rect2 get_region() const { return region; }
+	void set_margin(const Rect2 &p_margin) { margin = p_margin; }
+	Rect2 get_margin() const { return margin; }
+    void set_original_size(const Vector2 &p_original_size) { original_size = p_original_size; }
+	Vector2 get_original_size() const { return original_size; }
+};
+
 class FlashDocument: public FlashElement {
     GDCLASS(FlashDocument, FlashElement);
 
@@ -80,7 +107,7 @@ class FlashDocument: public FlashElement {
     float frame_size;
     List <Ref<FlashTimeline>> timelines;
     int last_eid;
-    Ref<Texture> atlas;
+    Ref<TextureArray> atlas;
     Dictionary variants;
 
     static String invalid_character;
@@ -98,8 +125,10 @@ public:
 
     static Ref<FlashDocument> from_file(const String &p_path);
     Error load_file(const String &path);
-    Ref<Texture> get_atlas();
-
+    
+    Vector2 get_atlas_size() const;
+    Ref<TextureArray> get_atlas() const { return atlas; }
+    void set_atlas(Ref<TextureArray> p_atlas) { atlas = p_atlas; }
     String get_document_path() const { return document_path; }
     Dictionary get_symbols() const { return symbols; }
     void set_symbols(Dictionary p_symbols) { symbols = p_symbols; }
@@ -113,7 +142,7 @@ public:
     
     FlashTimeline* get_timeline(String token);
     void parse_timeline(const String &path);
-    Ref<AtlasTexture> load_bitmap(const String &bitmap_name);
+    Ref<FlashTextureRect> get_bitmap_rect(const String &bitmap_name);
     inline float get_frame_size() const { return frame_size; }
     Ref<FlashTimeline> get_main_timeline();
 
@@ -123,12 +152,11 @@ public:
 
 };
 
-
 class FlashBitmapItem: public FlashElement {
     GDCLASS(FlashBitmapItem, FlashElement);
     String name;
     String bitmap_path;
-    Ref<AtlasTexture> texture;
+    Ref<FlashTextureRect> texture;
 public:
     FlashBitmapItem():
         name(""), 
@@ -138,8 +166,8 @@ public:
     
     String get_name() const { return name; };
     String get_bitmap_path() const { return bitmap_path; };
-    Ref<AtlasTexture> get_texture() const { return texture; };
-    void set_texture(Ref<AtlasTexture> p_texture) { texture = p_texture; };
+    Ref<FlashTextureRect> get_texture() const { return texture; };
+    void set_texture(Ref<FlashTextureRect> p_texture) { texture = p_texture; };
 
     virtual Error parse(Ref<XMLParser> xml);
 
@@ -364,7 +392,7 @@ class FlashBitmapInstance: public FlashDrawing {
     String library_item_name;
 
     Vector<Vector2> uvs;
-    Ref<AtlasTexture> texture;
+    Ref<FlashTextureRect> texture;
 
 public:
     FlashBitmapInstance():
@@ -372,7 +400,7 @@ public:
 
     static void _bind_methods();
 
-    Ref<AtlasTexture> get_texture();
+    Ref<FlashTextureRect> get_texture();
     String get_library_item_name() const { return library_item_name; }
     void set_library_item_name(String p_library_item_name) { library_item_name = p_library_item_name; }
 
@@ -429,8 +457,9 @@ public:
 
 VARIANT_ENUM_CAST(FlashTween::Method);
 
-class ResourceFormatLoaderFlashTexture: public ResourceFormatLoaderStreamTexture {
+class ResourceFormatLoaderFlashTexture: public ResourceFormatLoader {
 public:
+    virtual RES load(const String &p_path, const String &p_original_path = "", Error *r_error = NULL);
     virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual String get_resource_type(const String &p_path) const;

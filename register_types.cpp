@@ -24,6 +24,7 @@ void register_flash_types() {
 #endif
 	ClassDB::register_virtual_class<FlashElement>();
 	ClassDB::register_class<FlashPlayer>();
+	ClassDB::register_class<FlashTextureRect>();
 	ClassDB::register_class<FlashDocument>();
 	ClassDB::register_class<FlashBitmapItem>();
 	ClassDB::register_class<FlashTimeline>();

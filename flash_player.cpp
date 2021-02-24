@@ -14,8 +14,10 @@ void FlashPlayer::_notification(int p_what) {
                 clipping_texture->create_from_image(clipping_data);
                 VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
             }
-            if (resource.is_valid())
-                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
+            if (resource.is_valid()) {
+                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
+                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
+            }
         } break;
         case NOTIFICATION_READY: {
             set_process(true);
@@ -49,7 +51,7 @@ void FlashPlayer::_notification(int p_what) {
                     arrays, Array(),
                     VisualServer::ARRAY_FLAG_USE_2D_VERTICES
                 );
-                VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh, Transform2D(), Color(1,1,1), resource->get_atlas()->get_rid());
+                VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh);
                 performance_triangles_drawn = indices.size() / 3;
             }
         } break;
@@ -202,7 +204,8 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         active_timeline = resource->get_main_timeline();
         if (active_timeline.is_valid())
             playback_end = active_timeline->get_duration();
-        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas()->get_size());
+        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
+        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
     }
     batch();
     _change_notify();
@@ -241,7 +244,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "resource", PROPERTY_HINT_RESOURCE_TYPE, "FlashDocument"), "set_resource", "get_resource");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, ""), "set_active_timeline", "get_active_timeline");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, ""), "set_active_label", "get_active_label");
-    
+
 }
 
 float FlashPlayer::get_duration(String p_timeline, String p_label) {
@@ -263,7 +266,7 @@ void FlashPlayer::set_active_timeline(String p_value) {
     } else {
         active_timeline_name = "";
     }
-    
+
     if (active_timeline.is_valid()) {
         playback_end = active_timeline->get_duration();
     } else {
@@ -313,7 +316,7 @@ void FlashPlayer::batch() {
     points.resize(0);
     colors.resize(0);
     uvs.resize(0);
-    
+
     if (!active_timeline.is_valid()) {
         update();
         return;
@@ -325,31 +328,34 @@ void FlashPlayer::batch() {
 
 }
 
-void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs) {
+void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx) {
     Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
     for (int i=0; i<local_indices.size(); i++){
         indices.push_back(local_indices[i] + points.size());
     }
     int clipping_id = clipping_cache.size();
-    int clipping_size = clipping_items.size();
+    int clipping_size_with_tex_idx = (clipping_items.size() << 8) | (p_texture_idx & 0xff);
     for (int i=0; i<p_points.size(); i++) {
         points.push_back(p_points[i]);
         colors.push_back(p_colors[i]);
-        uvs.push_back(p_uvs[i] * 0.5 + Vector2(clipping_id, clipping_size));
+        uvs.push_back(p_uvs[i] * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
     }
 }
 
 void FlashPlayer::update_clipping_data() {
     clipping_data->lock();
     Vector2i pos = Vector2i(0, 0);
+    Transform2D scale;
+    //scale.scale(Vector2(2.0, 2.0));
+
     Transform2D glob = get_viewport_transform() * get_global_transform_with_canvas();
     for (List<FlashMaskItem>::Element *E = clipping_cache.front(); E; E = E->next()) {
         FlashMaskItem item = E->get();
-        Transform2D tr = (glob * item.transform).affine_inverse();
+        Transform2D tr = (glob * item.transform * scale).affine_inverse();
         Color xy = Color(tr[0].x, tr[0].y, tr[1].x, tr[1].y);
-        Color origin = Color(tr[2].x, tr[2].y, 0, 0);
+        Color origin = Color(tr[2].x, tr[2].y, item.texture_idx, 0);
         Color region = Color(
-            item.texture_region.position.x, 
+            item.texture_region.position.x,
             item.texture_region.position.y,
             item.texture_region.size.width,
             item.texture_region.size.height
@@ -370,15 +376,25 @@ void FlashPlayer::update_clipping_data() {
 
 void FlashPlayer::mask_begin(int mask_id) {
     if (!current_mask) current_mask = mask_id;
+    masks.set(current_mask, List<FlashMaskItem>());
+    mask_stack.push_back(mask_id);
 }
 void FlashPlayer::mask_end(int mask_id) {
-    if (current_mask == mask_id) current_mask = 0;
+    if (current_mask == mask_id) {
+        mask_stack.pop_front();
+        if (mask_stack.size() > 0) {
+            current_mask = mask_stack.back()->get();
+        } else {
+            current_mask = 0;
+        }
+    }
 }
 bool FlashPlayer::is_masking() {
     return current_mask > 0;
 }
-void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region) {
+void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region, int p_texture_idx) {
     FlashMaskItem item;
+    item.texture_idx = p_texture_idx;
     item.texture_region = p_texture_region;
     item.transform = p_transform;
     if (!masks.has(current_mask)) {
@@ -437,17 +453,24 @@ FlashPlayer::FlashPlayer() {
     if (flash_shader == RID()) {
         print_line("creating new shader");
         flash_shader = vs->shader_create();
-        vs->shader_set_code(flash_shader, 
+        vs->shader_set_code(flash_shader,
             "shader_type canvas_item;\n"
+
+            "uniform sampler2DArray ATLAS;\n"
             "uniform sampler2D CLIPPING_TEXTURE;\n"
             "uniform vec2 ATLAS_SIZE;\n"
             "varying float CLIPPING_SIZE;\n"
+            "varying float CLIPPING_IDX[4];"
             "varying vec4 CLIPPING_UV[4];\n"
+            "varying float TEX_IDX;\n"
+
             "void vertex() {\n"
-            "   float clipping_size = 0.0;\n"
+            "   float clipping_size_with_tex_idx = 0.0;\n"
             "   float clipping_id = 0.0;\n"
             "   UV.x = 2.0 * modf(UV.x, clipping_id);\n"
-            "   UV.y = 2.0 * modf(UV.y, clipping_size);\n"
+            "   UV.y = 2.0 * modf(UV.y, clipping_size_with_tex_idx);\n"
+            "   TEX_IDX = float(int(clipping_size_with_tex_idx) & 255);\n"
+            "   float clipping_size = float(int(clipping_size_with_tex_idx) >> 8);\n"
             "   CLIPPING_SIZE = min(clipping_size, 4.0);\n"
             "   for (int i=0; i<int(CLIPPING_SIZE); i++) {"
             "       int dcx = int(clipping_id*4.0) % 32;\n"
@@ -468,6 +491,7 @@ FlashPlayer::FlashPlayer() {
             "       vec2 clipping_pos = (local * vec4(VERTEX, 0.0 ,1.0)).xy;\n"
             "       CLIPPING_UV[i].xy = clipping_pos / tex_size;\n"
             "       CLIPPING_UV[i].zw = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"
+            "       CLIPPING_IDX[i] = tr_origin.b;\n"
             "   }\n"
             "}\n"
 
@@ -476,7 +500,7 @@ FlashPlayer::FlashPlayer() {
             "   if (CLIPPING_SIZE > 0.0) masked = 0.0;\n"
             "   for (int i=0; i<int(CLIPPING_SIZE); i++) {\n"
             "       if (CLIPPING_UV[i].x >= 0.0 && CLIPPING_UV[i].x <= 1.0 && CLIPPING_UV[i].y >= 0.0 && CLIPPING_UV[i].y <= 1.0) {\n"
-            "           vec4 mask = texture(TEXTURE, CLIPPING_UV[i].zw);\n"
+            "           vec4 mask = texture(ATLAS, vec3(CLIPPING_UV[i].zw, CLIPPING_IDX[i]));\n"
             "           if (mask.a >= 1.0) {\n"
             "               masked = 1.0;\n"
             "               break;\n"
@@ -486,7 +510,7 @@ FlashPlayer::FlashPlayer() {
             "   }\n"
             "   if (masked >= 0.0) {\n"
             "       vec4 add;\n"
-            "       vec4 c = texture(TEXTURE, UV);\n"
+            "       vec4 c = texture(ATLAS, vec3(UV, TEX_IDX));\n"
             "       vec4 mult = 2.0*modf(COLOR, add);\n"
             "       COLOR = clamp(abs(c * mult) + add / 255.0, vec4(0.0), vec4(1.0));\n"
             "       if (c.a == 0.0) {\n"

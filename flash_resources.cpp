@@ -2,6 +2,8 @@
 #ifdef MODULE_FLASH_ENABLED
 
 #include "flash_resources.h"
+#include "core/io/compression.h"
+#include "core/io/marshalls.h"
 
 FlashDocument *FlashElement::get_document() const {
     return document;
@@ -57,17 +59,17 @@ Transform2D FlashElement::parse_transform(Ref<XMLParser> xml) {
     ERR_FAIL_COND_V_MSG(xml->get_node_name() != "Matrix", Transform2D(), "Not Matrix node");
     float tx = 0, ty = 0, a = 1, b = 0, c = 0, d = 1;
     if (xml->has_attribute("tx"))
-        tx = xml->get_attribute_value("tx").to_float();
+        tx = xml->get_attribute_value_safe("tx").to_float();
     if (xml->has_attribute("ty"))
-        ty = xml->get_attribute_value("ty").to_float();
+        ty = xml->get_attribute_value_safe("ty").to_float();
     if (xml->has_attribute("a"))
-        a = xml->get_attribute_value("a").to_float();
+        a = xml->get_attribute_value_safe("a").to_float();
     if (xml->has_attribute("b"))
-        b = xml->get_attribute_value("b").to_float();
+        b = xml->get_attribute_value_safe("b").to_float();
     if (xml->has_attribute("c"))
-        c = xml->get_attribute_value("c").to_float();
+        c = xml->get_attribute_value_safe("c").to_float();
     if (xml->has_attribute("d"))
-        d = xml->get_attribute_value("d").to_float();
+        d = xml->get_attribute_value_safe("d").to_float();
     return Transform2D(a, b, c, d, tx, ty);
 }
 
@@ -76,6 +78,8 @@ Error FlashElement::parse(Ref<XMLParser> xml) {
 }
 void FlashDocument::_bind_methods() {
     ClassDB::bind_method(D_METHOD("load_file", "path"), &FlashDocument::load_file);
+    ClassDB::bind_method(D_METHOD("get_atlas"), &FlashDocument::get_atlas);
+    ClassDB::bind_method(D_METHOD("set_atlas", "atlas"), &FlashDocument::set_atlas);
     ClassDB::bind_method(D_METHOD("get_symbols"), &FlashDocument::get_symbols);
     ClassDB::bind_method(D_METHOD("set_symbols", "symbols"), &FlashDocument::set_symbols);
     ClassDB::bind_method(D_METHOD("get_bitmaps"), &FlashDocument::get_bitmaps);
@@ -85,6 +89,7 @@ void FlashDocument::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashDocument::get_duration, DEFVAL(String()), DEFVAL(String()));
     ClassDB::bind_method(D_METHOD("get_variants"), &FlashDocument::get_variants);
 
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "atlas", PROPERTY_HINT_RESOURCE_TYPE, "TextureArray", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_atlas", "get_atlas");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "symbols", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_symbols", "get_symbols");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "bitmaps", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_bitmaps", "get_bitmaps");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "timelines", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_timelines", "get_timelines");
@@ -162,6 +167,9 @@ Ref<FlashDocument> FlashDocument::from_file(const String &p_path) {
     ERR_FAIL_COND_V_MSG(err != Error::OK, Ref<FlashDocument>(), "Can't open " + p_path);
     return doc;
 }
+Vector2 FlashDocument::get_atlas_size() const {
+    return atlas.is_valid() ? Vector2(atlas->get_width(), atlas->get_height()) : Vector2();
+}
 Error FlashDocument::load_file(const String &p_path) {
     Ref<XMLParser> xml; xml.instance();
     Error err = xml->open(p_path);
@@ -173,18 +181,6 @@ Error FlashDocument::load_file(const String &p_path) {
     err = parse(xml);
     ERR_FAIL_COND_V_MSG(err != Error::OK, err, "Can't parse " + p_path);
     return OK;
-}
-Ref<Texture> FlashDocument::get_atlas() {
-    if (atlas.is_valid())
-        return atlas;
-    if (!bitmaps.size())
-        return Ref<Texture>();
-    Ref<FlashBitmapItem> item = bitmaps.get_value_at_index(0);
-    Ref<Texture> texture = item->get_texture();
-    AtlasTexture *atlas_texture = Object::cast_to<AtlasTexture>(texture.ptr());
-    if (atlas_texture)
-        atlas = atlas_texture->get_atlas();
-    return atlas;
 }
 
 FlashTimeline* FlashDocument::get_timeline(String token) {
@@ -207,11 +203,6 @@ void FlashDocument::parse_timeline(const String &path) {
     symbols[timeline->token] = timeline;
 }
 
-Ref<AtlasTexture> FlashDocument::load_bitmap(const String &bitmap_name) {
-    ERR_FAIL_COND_V_MSG(!bitmaps.has(bitmap_name), Ref<AtlasTexture>(), "No bitmap found for " + bitmap_name);
-    Ref<FlashBitmapItem> item = bitmaps[bitmap_name];
-    return item->get_texture();
-}
 void FlashDocument::setup(FlashDocument *p_document, FlashElement *p_parent) {
     document = this;
     parent = NULL;
@@ -236,6 +227,11 @@ void FlashDocument::setup(FlashDocument *p_document, FlashElement *p_parent) {
 
     cache_variants();
 }
+Ref<FlashTextureRect> FlashDocument::get_bitmap_rect(const String &p_name) {
+    ERR_FAIL_COND_V_MSG(!bitmaps.has(p_name), Ref<FlashTextureRect>(), "No bitmap found for " + p_name);
+    Ref<FlashBitmapItem> item = bitmaps[p_name];
+    return item->get_texture();
+}
 Ref<FlashTimeline> FlashDocument::get_main_timeline() {
     return timelines.front() ? timelines.front()->get() : Ref<FlashTimeline>();
 }
@@ -252,7 +248,7 @@ Error FlashDocument::parse(Ref<XMLParser> xml) {
             bitmaps[bitmap->get_name()] = bitmap;
         }
         else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "Include" && xml->has_attribute("href")) {
-            String path = xml->get_attribute_value("href");
+            String path = xml->get_attribute_value_safe("href");
             parse_timeline(path);
         }
     }
@@ -272,8 +268,8 @@ void FlashBitmapItem::_bind_methods() {
 }
 Error FlashBitmapItem::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("name") && xml->has_attribute("href")) {
-        name = xml->get_attribute_value("name");
-        bitmap_path = "LIBRARY/" + xml->get_attribute_value("href");
+        name = xml->get_attribute_value_safe("name");
+        bitmap_path = "LIBRARY/" + xml->get_attribute_value_safe("href");
         return Error::OK;
     } else {
         return Error::ERR_INVALID_DATA;
@@ -348,12 +344,12 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         if (xml->get_node_name() == "DOMSymbolItem" && xml->get_node_type() == XMLParser::NODE_ELEMENT) {
-            token = FlashDocument::validate_token(xml->get_attribute_value("name"));
+            token = FlashDocument::validate_token(xml->get_attribute_value_safe("name"));
         } else if (xml->get_node_name() == "DOMTimeline") {
             if (xml->get_node_type() == XMLParser::NODE_ELEMENT_END || xml->is_empty()){
                 return Error::OK;
             } else {
-                //token = FlashDocument::validate_token(xml->get_attribute_value("name"));
+                //token = FlashDocument::validate_token(xml->get_attribute_value_safe("name"));
             }
         } else if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMLayer") {
 			Ref<FlashLayer> layer = add_child<FlashLayer>(xml);
@@ -427,9 +423,9 @@ void FlashLayer::setup(FlashDocument *p_document, FlashElement *p_parent) {
 }
 Error FlashLayer::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("name"))
-        layer_name = xml->get_attribute_value("name");
+        layer_name = xml->get_attribute_value_safe("name");
     if (xml->has_attribute("layerType"))
-        type = xml->get_attribute_value("layerType");
+        type = xml->get_attribute_value_safe("layerType");
     if (type == "guide") {
         if (xml->is_empty()) return ERR_SKIP;
         while (xml->read() == OK) {
@@ -439,9 +435,9 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
         }
     }
     if (xml->has_attribute("color"))
-        color = parse_color(xml->get_attribute_value("color"));
+        color = parse_color(xml->get_attribute_value_safe("color"));
     if (xml->has_attribute("parentLayerIndex")) {
-        int layer_index = xml->get_attribute_value("parentLayerIndex").to_int();
+        int layer_index = xml->get_attribute_value_safe("parentLayerIndex").to_int();
         FlashTimeline *tl = find_parent<FlashTimeline>();
         Ref<FlashLayer> parent_layer = tl->get_layer(layer_index);
         if (parent_layer.is_valid() && parent_layer->type == "mask") {
@@ -600,12 +596,12 @@ void FlashFrame::setup(FlashDocument *p_document, FlashElement *p_parent) {
     }
 }
 Error FlashFrame::parse(Ref<XMLParser> xml) {
-    if (xml->has_attribute("index")) index = xml->get_attribute_value("index").to_int();
-    if (xml->has_attribute("duration")) duration = xml->get_attribute_value("duration").to_int();
-    if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value("keymode");
-    if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value("tweenType");
-    if (xml->has_attribute("name")) frame_name = xml->get_attribute_value("name").strip_edges(true, true);
-    if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value("labelType");
+    if (xml->has_attribute("index")) index = xml->get_attribute_value_safe("index").to_int();
+    if (xml->has_attribute("duration")) duration = xml->get_attribute_value_safe("duration").to_int();
+    if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value_safe("keymode");
+    if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value_safe("tweenType");
+    if (xml->has_attribute("name")) frame_name = xml->get_attribute_value_safe("name").strip_edges(true, true);
+    if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value_safe("labelType");
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -755,16 +751,16 @@ void FlashInstance::set_color_effect(PoolColorArray p_color_effect) {
 }
 Error FlashInstance::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("libraryItemName")) {
-        timeline_token = FlashDocument::validate_token(xml->get_attribute_value("libraryItemName"));
+        timeline_token = FlashDocument::validate_token(xml->get_attribute_value_safe("libraryItemName"));
     }
     if (xml->has_attribute("firstFrame"))
-        first_frame = xml->get_attribute_value("firstFrame").to_int();
+        first_frame = xml->get_attribute_value_safe("firstFrame").to_int();
     if (xml->has_attribute("loop"))
-        loop = xml->get_attribute_value("loop");
+        loop = xml->get_attribute_value_safe("loop");
     if (xml->has_attribute("centerPoint3DX"))
-        center_point.x = xml->get_attribute_value("centerPoint3DX").to_float();
+        center_point.x = xml->get_attribute_value_safe("centerPoint3DX").to_float();
     if (xml->has_attribute("centerPoint3DY"))
-        center_point.y = xml->get_attribute_value("centerPoint3DY").to_float();
+        center_point.y = xml->get_attribute_value_safe("centerPoint3DY").to_float();
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -774,15 +770,15 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
             transform = parse_transform(xml);
         if (xml->get_node_name() == "Point") {
             if (xml->has_attribute("x"))
-                transformation_point.x = xml->get_attribute_value("x").to_float();
+                transformation_point.x = xml->get_attribute_value_safe("x").to_float();
             if (xml->has_attribute("y"))
-                transformation_point.y = xml->get_attribute_value("y").to_float();
+                transformation_point.y = xml->get_attribute_value_safe("y").to_float();
         }
         if (xml->get_node_name() == "Color") {
             if (xml->has_attribute("tintColor")) {
-                Color tint = parse_color(xml->get_attribute_value("tintColor"));
+                Color tint = parse_color(xml->get_attribute_value_safe("tintColor"));
                 float amount = xml->has_attribute("tintMultiplier") ?
-                    xml->get_attribute_value("tintMultiplier").to_float() : 0.0;
+                    xml->get_attribute_value_safe("tintMultiplier").to_float() : 0.0;
 
                 color_effect.add.r = tint.r * amount;
                 color_effect.add.g = tint.g * amount;
@@ -800,18 +796,18 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
                 || xml->has_attribute("blueOffset")
                 || xml->has_attribute("alphaOffset")
             ) {
-                color_effect.mult.r = xml->has_attribute("redMultiplier") ? xml->get_attribute_value("redMultiplier").to_float() : 1.0;
-                color_effect.mult.g = xml->has_attribute("greenMultiplier") ? xml->get_attribute_value("greenMultiplier").to_float() : 1.0;
-                color_effect.mult.b = xml->has_attribute("blueMultiplier") ? xml->get_attribute_value("blueMultiplier").to_float() : 1.0;
-                color_effect.mult.a = xml->has_attribute("alphaMultiplier") ? xml->get_attribute_value("alphaMultiplier").to_float() : 1.0;
-                color_effect.add.r = xml->has_attribute("greenOffset") ? xml->get_attribute_value("redOffset").to_float()/255.0 : 0.0;
-                color_effect.add.g = xml->has_attribute("greenOffset") ? xml->get_attribute_value("greenOffset").to_float()/255.0 : 0.0;
-                color_effect.add.b = xml->has_attribute("blueOffset") ? xml->get_attribute_value("blueOffset").to_float()/255.0 : 0.0;
-                color_effect.add.a = xml->has_attribute("alphaOffset") ? xml->get_attribute_value("alphaOffset").to_float()/255.0 : 0.0;
+                color_effect.mult.r = xml->has_attribute("redMultiplier") ? xml->get_attribute_value_safe("redMultiplier").to_float() : 1.0;
+                color_effect.mult.g = xml->has_attribute("greenMultiplier") ? xml->get_attribute_value_safe("greenMultiplier").to_float() : 1.0;
+                color_effect.mult.b = xml->has_attribute("blueMultiplier") ? xml->get_attribute_value_safe("blueMultiplier").to_float() : 1.0;
+                color_effect.mult.a = xml->has_attribute("alphaMultiplier") ? xml->get_attribute_value_safe("alphaMultiplier").to_float() : 1.0;
+                color_effect.add.r = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("redOffset").to_float()/255.0 : 0.0;
+                color_effect.add.g = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("greenOffset").to_float()/255.0 : 0.0;
+                color_effect.add.b = xml->has_attribute("blueOffset") ? xml->get_attribute_value_safe("blueOffset").to_float()/255.0 : 0.0;
+                color_effect.add.a = xml->has_attribute("alphaOffset") ? xml->get_attribute_value_safe("alphaOffset").to_float()/255.0 : 0.0;
             } else if (xml->has_attribute("alphaMultiplier")) {
-                color_effect.mult.a = xml->get_attribute_value("alphaMultiplier").to_float();
+                color_effect.mult.a = xml->get_attribute_value_safe("alphaMultiplier").to_float();
             } else if (xml->has_attribute("brightness")) {
-                float b = xml->get_attribute_value("brightness").to_float();
+                float b = xml->get_attribute_value_safe("brightness").to_float();
                 if (b < 0) {
                     color_effect.mult.r = 1 + b;
                     color_effect.mult.g = 1 + b;
@@ -851,7 +847,7 @@ void FlashBitmapInstance::_bind_methods(){
 }
 Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     if(xml->has_attribute("libraryItemName"))
-        library_item_name = xml->get_attribute_value("libraryItemName");
+        library_item_name = xml->get_attribute_value_safe("libraryItemName");
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -863,19 +859,22 @@ Error FlashBitmapInstance::parse(Ref<XMLParser> xml) {
     return Error::OK;
 }
 
-Ref<AtlasTexture> FlashBitmapInstance::get_texture() {
+Ref<FlashTextureRect> FlashBitmapInstance::get_texture() {
     if (texture.is_null()) {
-        texture = document->load_bitmap(library_item_name);
+        texture = document->get_bitmap_rect(library_item_name);
     }
     return texture;
 }
 
 void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
-    Ref<AtlasTexture> tex = get_texture();
+    Ref<FlashTextureRect> tex = get_texture();
+    if (!tex.is_valid()) {
+        return;
+    }
     if (node->is_masking()) {
-        if (tex.is_valid()) {
-            node->mask_add(tr, tex->get_region());
-        }
+        Transform2D scale;
+        scale.scale(tex->get_original_size()/tex->get_region().size);
+        node->mask_add(tr * scale, tex->get_region(), tex->get_index());
         return;
     }
     // if (node->is_masking()) {
@@ -898,15 +897,14 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
     colors.push_back(color);
     colors.push_back(color);
     Vector<Vector2> points;
-    Vector2 size = tex->get_region().size;
+    Vector2 size = tex->get_original_size();
     points.push_back(tr.xform(Vector2()));
     points.push_back(tr.xform(Vector2(size.x, 0)));
     points.push_back(tr.xform(size));
     points.push_back(tr.xform(Vector2(0, size.y)));
 
     if (uvs.size()  == 0) {
-        Ref<Texture> atlas = tex->get_atlas();
-        Vector2 as = atlas->get_size();
+        Vector2 as = document->get_atlas_size();
         Rect2 r = tex->get_region();
         Vector2 start = r.position / as;
         Vector2 end = (r.position + r.size) / as;
@@ -916,7 +914,7 @@ void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, F
         uvs.push_back(Vector2(start.x, end.y));
     }
 
-    node->add_polygon(points, colors, uvs);
+    node->add_polygon(points, colors, uvs, tex->get_index());
 }
 
 void FlashTween::_bind_methods() {
@@ -968,15 +966,15 @@ void FlashTween::_bind_methods() {
 Error FlashTween::parse(Ref<XMLParser> xml) {
     String n = xml->get_node_name();
     if (xml->has_attribute("target"))
-        target = xml->get_attribute_value("target");
+        target = xml->get_attribute_value_safe("target");
     if (xml->has_attribute("intensity")) {
         method = CLASSIC;
-        intensity = xml->get_attribute_value("intensity").to_int();
+        intensity = xml->get_attribute_value_safe("intensity").to_int();
     }
     if (n == "CustomEase") {
         method = CUSTOM;
     } else if (xml->has_attribute("method")) {
-        String mname = xml->get_attribute_value("method");
+        String mname = xml->get_attribute_value_safe("method");
         method =
             mname == "quadIn"       ? IN_QUINT :
             mname == "quadOut"      ? OUT_QUINT :
@@ -1017,8 +1015,8 @@ Error FlashTween::parse(Ref<XMLParser> xml) {
             return Error::OK;
         if (xml->get_node_name() == "Point") {
             Vector2 p = Vector2();
-            if (xml->has_attribute("x")) p.x = xml->get_attribute_value("x").to_float();
-            if (xml->has_attribute("y")) p.y = xml->get_attribute_value("y").to_float();
+            if (xml->has_attribute("x")) p.x = xml->get_attribute_value_safe("x").to_float();
+            if (xml->has_attribute("y")) p.y = xml->get_attribute_value_safe("y").to_float();
             points.push_back(p);
         }
     }
@@ -1156,15 +1154,64 @@ float FlashTween::interpolate(float time) {
     }
 }
 
+void FlashTextureRect::_bind_methods() {
+
+	ClassDB::bind_method(D_METHOD("set_index", "index"), &FlashTextureRect::set_index);
+	ClassDB::bind_method(D_METHOD("get_index"), &FlashTextureRect::get_index);
+	ClassDB::bind_method(D_METHOD("set_region", "region"), &FlashTextureRect::set_region);
+	ClassDB::bind_method(D_METHOD("get_region"), &FlashTextureRect::get_region);
+	ClassDB::bind_method(D_METHOD("set_margin", "margin"), &FlashTextureRect::set_margin);
+	ClassDB::bind_method(D_METHOD("get_margin"), &FlashTextureRect::get_margin);
+    ClassDB::bind_method(D_METHOD("set_original_size", "original_size"), &FlashTextureRect::set_original_size);
+	ClassDB::bind_method(D_METHOD("get_original_size"), &FlashTextureRect::get_original_size);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "index"), "set_index", "get_index");
+	ADD_PROPERTY(PropertyInfo(Variant::RECT2, "region"), "set_region", "get_region");
+	ADD_PROPERTY(PropertyInfo(Variant::RECT2, "margin"), "set_margin", "get_margin");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "original_size"), "set_original_size", "get_original_size");
+}
+
+RES ResourceFormatLoaderFlashTexture::load(const String &p_path, const String &p_original_path, Error *r_error) {
+	FileAccess *f = FileAccess::open(p_path, FileAccess::READ);
+    int decompressed_size = f->get_32();
+    int bytes;
+    PoolVector<uint8_t> buff;
+    buff.resize(f->get_len()-f->get_position());
+    {
+        PoolVector<uint8_t>::Write w = buff.write();
+        bytes = f->get_buffer(w.ptr(), buff.size());
+    }
+
+    PoolVector<uint8_t> decompressed;
+    decompressed.resize(decompressed_size);
+    Compression::decompress(decompressed.write().ptr(), decompressed.size(), buff.read().ptr(), bytes, Compression::MODE_FASTLZ);
+
+    PoolVector<uint8_t>::Read r = decompressed.read();
+    Variant texture_info_var;
+    decode_variant(texture_info_var, r.ptr(), decompressed.size(), NULL, true);
+    Dictionary texture_info = texture_info_var;
+    Array images = texture_info["images"];
+    Ref<TextureArray> texture;
+    texture.instance();
+    texture->create((int)texture_info["width"], (int)texture_info["height"], images.size(), (Image::Format)(int)texture_info["format"], (int)texture_info["flags"]);
+
+    for (int i=0; i<images.size(); i++){
+        Ref<Image> img = images[i];
+        texture->set_layer_data(img, i);
+    }
+    memdelete(f);
+    return texture;
+}
+
 void ResourceFormatLoaderFlashTexture::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back("ftex");
 }
 bool ResourceFormatLoaderFlashTexture::handles_type(const String &p_type) const {
-	return p_type == "StreamTexture" || p_type == "Texture";
+	return p_type == "TextureArray";
 }
 String ResourceFormatLoaderFlashTexture::get_resource_type(const String &p_path) const {
 	if (p_path.get_extension().to_lower() == "ftex")
-		return "Texture";
+		return "TextureArray";
 	return "";
 }
 #endif
