@@ -58,6 +58,13 @@ bool ResourceImporterFlash::are_import_settings_valid(const String &p_path) cons
 		return false;
 	}
 
+#ifndef GODOT_FEATURE_IMPORTER_VERSION
+    int imported_with_version = metadata.get("importer_version", 0);
+    if (imported_with_version != get_importer_version()) {
+        return false;
+    }
+#endif
+
 	bool vram = metadata["vram_texture"];
 	if (!vram) {
 		return true; //do not care about non vram
@@ -86,7 +93,6 @@ bool ResourceImporterFlash::are_import_settings_valid(const String &p_path) cons
 }
 
 Error ResourceImporterFlash::import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
-
     int compress_mode = p_options["compress/mode"];
 	int no_bptc_if_rgb = p_options["compress/no_bptc_if_rgb"];
 	int repeat = p_options["flags/repeat"];
@@ -327,6 +333,9 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 
 	if (r_metadata) {
 		Dictionary metadata;
+#ifndef GODOT_FEATURE_IMPORTER_VERSION
+        metadata["importer_version"] = get_importer_version();
+#endif
 		metadata["vram_texture"] = compress_mode == COMPRESS_VIDEO_RAM;
 		if (formats_imported.size()) {
 			metadata["imported_formats"] = formats_imported;

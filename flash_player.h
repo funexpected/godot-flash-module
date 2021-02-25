@@ -40,7 +40,7 @@ class FlashPlayer: public Node2D {
     Vector<Vector2> uvs;
     Vector<Color> colors;
     Vector<int> indices;
-    
+
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
     HashMap<int, List<FlashMaskItem>> masks;
@@ -92,7 +92,7 @@ public:
     void batch();
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
-    
+
     bool is_masking();
     void mask_begin(int layer);
     void mask_add(Transform2D p_transform, Rect2i p_texture_region, int p_texture_idx);

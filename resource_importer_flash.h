@@ -39,7 +39,10 @@ public:
 	virtual String get_import_settings_string() const;
 
 	virtual String get_resource_type() const;
-	virtual int get_importer_version() const;
+#ifdef GODOT_FEATURE_IMPORTER_VERSION
+	virtual
+#endif
+	int get_importer_version() const;
 
     virtual Error import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files = NULL, Variant *r_metadata = NULL);
 

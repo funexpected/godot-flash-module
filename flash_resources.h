@@ -21,8 +21,8 @@ struct FlashColorEffect {
     Color add;
     Color mult;
 
-    FlashColorEffect() : 
-        add(Color(0,0,0,0)), 
+    FlashColorEffect() :
+        add(Color(0,0,0,0)),
         mult(Color(1,1,1,1)) {}
 
     inline FlashColorEffect interpolate(FlashColorEffect effect, float amount) {
@@ -61,7 +61,7 @@ public:
     template <class T>  Ref<T> add_child(Ref<XMLParser> parser, List< Ref<T> > *elements = NULL);
     Color parse_color(const String &p_color) const;
     Transform2D parse_transform(Ref<XMLParser> parser);
-    
+
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
 
     template <class T>
@@ -113,7 +113,7 @@ class FlashDocument: public FlashElement {
     static String invalid_character;
 
 public:
-    FlashDocument(): 
+    FlashDocument():
         document_path(""),
         frame_size(1.0/24.0),
         last_eid(0){}
@@ -125,7 +125,7 @@ public:
 
     static Ref<FlashDocument> from_file(const String &p_path);
     Error load_file(const String &path);
-    
+
     Vector2 get_atlas_size() const;
     Ref<TextureArray> get_atlas() const { return atlas; }
     void set_atlas(Ref<TextureArray> p_atlas) { atlas = p_atlas; }
@@ -139,7 +139,7 @@ public:
     float get_duration(String timeline = String(), String label = String());
     Dictionary get_variants() const;
     void cache_variants();
-    
+
     FlashTimeline* get_timeline(String token);
     void parse_timeline(const String &path);
     Ref<FlashTextureRect> get_bitmap_rect(const String &bitmap_name);
@@ -159,11 +159,11 @@ class FlashBitmapItem: public FlashElement {
     Ref<FlashTextureRect> texture;
 public:
     FlashBitmapItem():
-        name(""), 
+        name(""),
         bitmap_path("") {}
 
     static void _bind_methods();
-    
+
     String get_name() const { return name; };
     String get_bitmap_path() const { return bitmap_path; };
     Ref<FlashTextureRect> get_texture() const { return texture; };
@@ -215,7 +215,7 @@ class FlashLayer: public FlashElement {
     GDCLASS(FlashLayer, FlashElement);
     friend FlashDocument;
     friend FlashFrame;
-    
+
     int index;
     String layer_name;
     String type;
@@ -315,7 +315,7 @@ public:
     virtual Error parse(Ref<XMLParser> xml);
     void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
-     
+
 };
 
 class FlashInstance: public FlashDrawing {
@@ -354,7 +354,7 @@ public:
     String get_timeline_token() const { return timeline_token; }
     void set_timeline_token(String p_name) { timeline_token = p_name; }
     String get_layer_name() const { return layer_name; }
-    
+
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     FlashTimeline* get_timeline();
     virtual Error parse(Ref<XMLParser> xml);
@@ -449,7 +449,7 @@ public:
     void set_intensity(float p_intesity) { intensity = p_intesity; }
     PoolVector2Array get_points() const { return points; }
     void set_points(PoolVector2Array p_points) { points = p_points; }
-  
+
     Error parse(Ref<XMLParser> xml);
 
     float interpolate(float time);
