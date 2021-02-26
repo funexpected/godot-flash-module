@@ -213,12 +213,12 @@ jobs:
         run: find release
       - name: Prepare assets
         run: |
-          mv godot.x11.osx godot-flash
-          zip -r godot-flash.linux.zip godot-flash
-          mv godot.osx.tools godot-flash
-          zip -r godot-flash.osx.zip godot-flash
-          mv godow.windows.tools godot-flash.exe
-          zip -r godot-flash.windows.zip godot-flash.exe
+          mv release/godot.windows.opt.tools.64.exe release/godot-flash
+          zip -r release/godot-flash.windows.zip release/godot-flash
+          mv release/godot.x11.opt.tools.64 release/godot-flash
+          zip -r release/godot-flash.linux.zip release/godot-flash
+          mv release/godot.windows.opt.tools.64.exe release/godot-flash.exe
+          zip -r release/godot.windows.opt.tools.64.exe release/godot-flash.exe
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
