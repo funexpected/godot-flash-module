@@ -65,7 +65,6 @@ void ResourceImporterFlash::get_import_options(List<ImportOption> *r_options, in
 
     r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "process/downscale", PROPERTY_HINT_ENUM, "Disabled,x2,x4"), 1));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "compress/mode", PROPERTY_HINT_ENUM, "Lossless (PNG),Video RAM (S3TC/ETC/BPTC),Uncompressed", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), 1));
-	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "compress/no_bptc_if_rgb"), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "flags/repeat", PROPERTY_HINT_ENUM, "Disabled,Enabled,Mirrored"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "flags/filter"), true));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "flags/mipmaps"), true));
@@ -117,7 +116,6 @@ bool ResourceImporterFlash::are_import_settings_valid(const String &p_path) cons
 
 Error ResourceImporterFlash::import(const String &p_source_file, const String &p_save_path, const Map<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
     int compress_mode = p_options["compress/mode"];
-	int no_bptc_if_rgb = p_options["compress/no_bptc_if_rgb"];
 	int repeat = p_options["flags/repeat"];
 	bool filter = p_options["flags/filter"];
 	bool mipmaps = p_options["flags/mipmaps"];
@@ -261,7 +259,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
             img->convert(Image::FORMAT_RGBA8);
         }
         img->fix_alpha_edges();
-        for (int i=0; i<downscale; i++) {
+        for (int j=0; j<downscale; j++) {
             img->shrink_x2();
             img->fix_alpha_edges();
         }
@@ -303,7 +301,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		//Android, GLES 2.x
 
 		bool ok_on_pc = false;
-		bool encode_bptc = false;
 
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_s3tc")) {

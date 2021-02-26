@@ -259,7 +259,6 @@ Ref<FlashTimeline> FlashDocument::get_main_timeline() {
 }
 Error FlashDocument::parse(Ref<XMLParser> xml) {
     while (xml->read() == Error::OK) {
-        XMLParser::NodeType type = xml->get_node_type();
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
         String n = xml->get_node_name();
         if (xml->get_node_type() == XMLParser::NODE_ELEMENT && xml->get_node_name() == "DOMTimeline") {
@@ -1173,6 +1172,7 @@ float FlashTween::interpolate(float time) {
 
             return low_pos.linear_interpolate(high_pos, c).y;
         }
+        default: return time;
     }
 }
 
