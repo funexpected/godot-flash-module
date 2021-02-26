@@ -4,6 +4,11 @@ on:
     # Sequence of patterns matched against refs/tags
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+env:
+  GODOT_BASE_BRANCH: 3.2
+  SCONS_CACHE_MSVC_CONFIG: true
+  SCONS_CACHE_LIMIT: 4096
+
 jobs:
   build-linux-editor:
     runs-on: "ubuntu-20.04"
@@ -67,10 +72,152 @@ jobs:
           scons -j2 verbose=yes warnings=all werror=yes platform=x11 tools=yes target=release_debug
       - name: List output
         run: find bin
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: editor.linux
+          path: bin/*
 
+  build-osx-editor:
+    runs-on: "macos-latest"
 
+    name: Editor (target=release_debug, tools=yes)
 
+    steps:
+      - name: Checkout Godot Engine 3.2
+        uses: actions/checkout@v2
+        with:
+          repository: 'godotengine/godot'
+          ref: '3.2.3-stable'
+      - name: Checkout Flash Module
+        uses: actions/checkout@v2
+        with:
+          path: 'modules/flash'
 
+      # Upload cache on completion and check it out now
+      - name: Load .scons_cache directory
+        id: macos-editor-cache
+        uses: actions/cache@v2
+        with:
+          path: ${{github.workspace}}/.scons_cache/
+          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          restore-keys: |
+            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}
+            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
+
+      # Use python 3.x release (works cross platform; best to keep self contained in it's own step)
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v2
+        with:
+          # Semantic version range syntax or exact version of a Python version
+          python-version: '3.x'
+          # Optional - x64 or x86 architecture, defaults to x64
+          architecture: 'x64'
+
+      # Setup scons, print python version and scons version info, so if anything is broken it won't run the build.
+      - name: Configuring Python packages
+        run: |
+          python -c "import sys; print(sys.version)"
+          python -m pip install scons
+          python --version
+          scons --version
+
+      # We should always be explicit with our flags usage here since it's gonna be sure to always set those flags
+      - name: Compilation
+        env:
+          SCONS_CACHE: ${{github.workspace}}/.scons_cache/
+        run: |
+          scons -j2 verbose=yes warnings=all werror=yes platform=osx tools=yes target=release_debug
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: editor.osx
+          path: bin/*
+
+  build-windows-editor:
+    # Windows 10 with latest image
+    runs-on: "windows-latest"
+
+    # Windows Editor - checkout with the plugin
+    name: Editor (target=release_debug, tools=yes)
+
+    steps:
+      - name: Checkout Godot Engine 3.2
+        uses: actions/checkout@v2
+        with:
+          repository: 'godotengine/godot'
+          ref: '3.2.3-stable'
+      - name: Checkout Flash Module
+        uses: actions/checkout@v2
+        with:
+          path: 'modules/flash'
+
+      # Upload cache on completion and check it out now
+      # Editing this is pretty dangerous for Windows since it can break and needs to be properly tested with a fresh cache.
+    - name: Load .scons_cache directory
+      id: windows-editor-cache
+      uses: RevoluPowered/cache@v2.1
+      with:
+        path: /.scons_cache/
+        key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+        restore-keys: |
+          ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}
+          ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
+
+    # Use python 3.x release (works cross platform; best to keep self contained in it's own step)
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v2
+      with:
+        # Semantic version range syntax or exact version of a Python version
+        python-version: '3.x'
+        # Optional - x64 or x86 architecture, defaults to x64
+        architecture: 'x64'
+
+    # Setup scons, print python version and scons version info, so if anything is broken it won't run the build.
+    - name: Configuring Python packages
+      run: |
+        python -c "import sys; print(sys.version)"
+        python -m pip install scons pywin32
+        python --version
+        scons --version
+
+    # We should always be explicit with our flags usage here since it's gonna be sure to always set those flags
+    - name: Compilation
+      env:
+        SCONS_CACHE: /.scons_cache/
+      run: |
+        scons -j2 verbose=yes warnings=all werror=yes platform=windows tools=yes target=release_debug
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: editor.windows
+        path: bin/*
+
+  archive:
+    runs-on: ubuntu-latest
+    needs: [build-linux-editor, build-osx-editor, build-windows-editor]
+    steps:
+      - run: mkdir -p release
+      - name: Download Linux editor
+        uses: actions/download-artifact@v2
+        with:
+          name: editor.linux
+          path: release
+      - name: Download OSX Editor
+        uses: actions/download-artifact@v2
+        with:
+          name: editor.osx
+          path: release
+      - name: Download Windows Editor
+        uses: actions/download-artifact@v2
+        with:
+          name: editor.windows
+          path: release
+      - name: Show contents
+        run: find release
 
 
   # build-toolkit-win:
