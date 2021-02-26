@@ -80,9 +80,6 @@ jobs:
 
   build-osx-editor:
     runs-on: "macos-latest"
-
-    name: Editor (target=release_debug, tools=yes)
-
     steps:
       - name: Checkout Godot Engine 3.2
         uses: actions/checkout@v2
@@ -138,10 +135,6 @@ jobs:
   build-windows-editor:
     # Windows 10 with latest image
     runs-on: "windows-latest"
-
-    # Windows Editor - checkout with the plugin
-    name: Editor (target=release_debug, tools=yes)
-
     steps:
       - name: Checkout Godot Engine 3.2
         uses: actions/checkout@v2
@@ -218,6 +211,55 @@ jobs:
           path: release
       - name: Show contents
         run: find release
+      - name: Prepare assets
+        run: |
+          mv godot.x11.osx godot-flash
+          zip -r godot-flash.linux.zip godot-flash
+          mv godot.osx.tools godot-flash
+          zip -r godot-flash.osx.zip godot-flash
+          mv godow.windows.tools godot-flash.exe
+          zip -r godot-flash.windows.zip godot-flash.exe
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Windows Editor
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./release/godot-flash.windows.zip
+          asset_name: godot-flash.windows.zip
+          asset_content_type: application/zip
+      - name: Upload OSX Editor
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./release/godot-flash.osx.zip
+          asset_name: godot-flash.osx.zip
+          asset_content_type: application/zip
+      - name: Upload Linux Editor
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./release/godot-flash.linux.zip
+          asset_name: godot-flash.linux.zip
+          asset_content_type: application/zip
+      
 
 
   # build-toolkit-win:
