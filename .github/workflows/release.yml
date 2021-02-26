@@ -41,12 +41,8 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{github.workspace}}/.scons_cache/
-          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-          restore-keys: |
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
-
+          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
+          
       # Use python 3.x release (works cross platform; best to keep self contained in it's own step)
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
@@ -97,11 +93,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{github.workspace}}/.scons_cache/
-          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-          restore-keys: |
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
+          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
 
       # Use python 3.x release (works cross platform; best to keep self contained in it's own step)
       - name: Set up Python 3.x
@@ -153,11 +145,7 @@ jobs:
         uses: RevoluPowered/cache@v2.1
         with:
           path: /.scons_cache/
-          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-          restore-keys: |
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}
-            ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
+          key: ${{github.job}}-${{env.GODOT_BASE_BRANCH}}
 
       # Use python 3.x release (works cross platform; best to keep self contained in it's own step)
       - name: Set up Python 3.x
@@ -213,12 +201,12 @@ jobs:
         run: find release
       - name: Prepare assets
         run: |
-          mv godot.x11.osx godot-flash
-          zip -r godot-flash.linux.zip godot-flash
-          mv godot.osx.tools godot-flash
-          zip -r godot-flash.osx.zip godot-flash
-          mv godow.windows.tools godot-flash.exe
-          zip -r godot-flash.windows.zip godot-flash.exe
+          mv release/godot.windows.opt.tools.64.exe release/godot-flash.exe
+          zip -r release/godot-flash.windows.zip release/godot-flash.exe
+          mv release/godot.x11.opt.tools.64 release/godot-flash
+          zip -r release/godot-flash.linux.zip release/godot-flash
+          mv release/godot.osx.opt.tools.64 release/godot-flash
+          zip -r release/godot-flash.osx.zip release/godot-flash
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
