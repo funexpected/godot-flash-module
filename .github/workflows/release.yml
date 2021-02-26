@@ -211,26 +211,26 @@ jobs:
           path: release
       - name: Show contents
         run: find release
-      # - name: Prepare assets
-      #   run: |
-      #     mv godot.x11.osx godot-flash
-      #     zip -r godot-flash.linux.zip godot-flash
-      #     mv godot.osx.tools godot-flash
-      #     zip -r godot-flash.osx.zip godot-flash
-      #     mv godow.windows.tools godot-flash.exe
-      #     zip -r godot-flash.windows.zip godot-flash.exe
-      # - name: Create Release
-      #   id: create_release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     tag_name: ${{ github.ref }}
-      #     release_name: Release ${{ github.ref }}
-      #     draft: false
-      #     prerelease: false
-      # - name: Upload Windows Editor
-        id: upload-release-asset 
+      - name: Prepare assets
+        run: |
+          mv godot.x11.osx godot-flash
+          zip -r godot-flash.linux.zip godot-flash
+          mv godot.osx.tools godot-flash
+          zip -r godot-flash.osx.zip godot-flash
+          mv godow.windows.tools godot-flash.exe
+          zip -r godot-flash.windows.zip godot-flash.exe
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Windows Editor
+        id: upload-windows-release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -240,7 +240,7 @@ jobs:
           asset_name: godot-flash.windows.zip
           asset_content_type: application/zip
       - name: Upload OSX Editor
-        id: upload-release-asset 
+        id: upload-osx-release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -250,7 +250,7 @@ jobs:
           asset_name: godot-flash.osx.zip
           asset_content_type: application/zip
       - name: Upload Linux Editor
-        id: upload-release-asset 
+        id: upload-linux-release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
