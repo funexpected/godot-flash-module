@@ -211,25 +211,25 @@ jobs:
           path: release
       - name: Show contents
         run: find release
-      - name: Prepare assets
-        run: |
-          mv godot.x11.osx godot-flash
-          zip -r godot-flash.linux.zip godot-flash
-          mv godot.osx.tools godot-flash
-          zip -r godot-flash.osx.zip godot-flash
-          mv godow.windows.tools godot-flash.exe
-          zip -r godot-flash.windows.zip godot-flash.exe
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Windows Editor
+      # - name: Prepare assets
+      #   run: |
+      #     mv godot.x11.osx godot-flash
+      #     zip -r godot-flash.linux.zip godot-flash
+      #     mv godot.osx.tools godot-flash
+      #     zip -r godot-flash.osx.zip godot-flash
+      #     mv godow.windows.tools godot-flash.exe
+      #     zip -r godot-flash.windows.zip godot-flash.exe
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ github.ref }}
+      #     release_name: Release ${{ github.ref }}
+      #     draft: false
+      #     prerelease: false
+      # - name: Upload Windows Editor
         id: upload-release-asset 
         uses: actions/upload-release-asset@v1
         env:
