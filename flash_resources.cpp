@@ -1085,9 +1085,9 @@ float FlashTween::interpolate(float time) {
         case IN_QUINT: return pow(time, 5);
         case OUT_QUINT: return 1 - pow(1 - time, 5);
         case INOUT_QUINT: return time < 0.5 ? 16 * pow(time, 5) : 1 - pow(-2 * time + 2, 5) / 2;
-        case IN_SINE: return 1 - cos((time * M_PI) / 2);
-        case OUT_SINE: return sin((time * M_PI) / 2);
-        case INOUT_SINE: return -(cos(M_PI * time) - 1) / 2;
+        case IN_SINE: return 1 - cos((time * Math_PI) / 2);
+        case OUT_SINE: return sin((time * Math_PI) / 2);
+        case INOUT_SINE: return -(cos(Math_PI * time) - 1) / 2;
         case IN_BACK: {
             const float c1 = 1.70158;
             const float c3 = c1 + 1;
@@ -1111,19 +1111,19 @@ float FlashTween::interpolate(float time) {
             ? (1 - sqrt(1 - pow(2 * time, 2))) / 2
             : (sqrt(1 - pow(-2 * time + 2, 2)) + 1) / 2;
         case IN_ELASTIC: {
-            const float c4 = (2 * M_PI) / 3;
+            const float c4 = (2 * Math_PI) / 3;
             return time == 0 ? 0
                  : time == 1 ? 1
                  : -pow(2, 10 * time - 10) * sin((time * 10 - 10.75) * c4);
         }
         case OUT_ELASTIC: {
-            const float c4 = (2 * M_PI) / 3;
+            const float c4 = (2 * Math_PI) / 3;
             return time == 0 ? 0
                  : time == 1 ? 1
                  : pow(2, -10 * time) * sin((time * 10 - 0.75) * c4) + 1;
         };
         case INOUT_ELASTIC: {
-            const float c5 = (2 * M_PI) / 4.5;
+            const float c5 = (2 * Math_PI) / 4.5;
             return time == 0 ? 0
                  : time == 1 ? 1
                  : time < 0.5
