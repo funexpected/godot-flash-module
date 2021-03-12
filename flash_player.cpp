@@ -50,12 +50,19 @@ void FlashPlayer::_notification(int p_what) {
         case NOTIFICATION_PROCESS: {
             performance_triangles_generated = 0;
             if (playing) {
+                bool animation_completed = false;
                 frame += get_process_delta_time()*frame_rate;
-                if (!loop && frame > playback_end)
+                if (!loop && frame > playback_end) {
+                    animation_completed = true;
                     frame = playback_end - 0.0001;
-                else while (frame > playback_end)
+                } else while (frame > playback_end) {
+                    animation_completed = true;
                     frame -= playback_end - playback_start;
+                }
                 batch();
+                if (animation_completed) {
+                    emit_signal("animation_completed");
+                }
             }
         } break;
 
@@ -269,6 +276,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, ""), "set_active_timeline", "get_active_timeline");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, ""), "set_active_label", "get_active_label");
 
+    ADD_SIGNAL(MethodInfo("animation_completed"));
 }
 
 float FlashPlayer::get_duration(String p_timeline, String p_label) {
