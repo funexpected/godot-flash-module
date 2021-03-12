@@ -60,6 +60,10 @@ struct FlashColorEffect {
         new_effect.add = add * effect.mult + effect.add;
         return new_effect;
     }
+
+    inline bool is_empty() const {
+        return add == Color(0,0,0,0) && mult == Color(1,1,1,1);
+    }
 };
 
 class FlashElement: public Resource {
@@ -82,6 +86,7 @@ public:
     static void _bind_methods();
     template <class T>  Ref<T> add_child(Ref<XMLParser> parser, List< Ref<T> > *elements = NULL);
     Color parse_color(const String &p_color) const;
+    FlashColorEffect parse_color_effect(Ref<XMLParser> parser) const;
     Transform2D parse_transform(Ref<XMLParser> parser);
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
@@ -301,6 +306,7 @@ class FlashFrame: public FlashElement {
     String label_type;
     String keymode;
     String tween_type;
+    FlashColorEffect color_effect;
 
     List<Ref<FlashDrawing>> elements;
     List<Ref<FlashTween>> tweens;
@@ -328,6 +334,8 @@ public:
     void set_keymode(String p_keymode) { keymode = p_keymode; }
     String get_tween_type() const { return tween_type; }
     void set_tween_type(String p_tween_type) { tween_type = p_tween_type; }
+    PoolColorArray get_color_effect() const;
+    void set_color_effect(PoolColorArray p_color_effect);
     Array get_elements();
     void set_elements(Array p_elements);
     Array get_tweens();

@@ -34,7 +34,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 10;
+const int ResourceImporterFlash::importer_version = 11;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
@@ -442,7 +442,7 @@ Error ResourceImporterFlash::_save_tex(
 			case COMPRESS_VIDEO_RAM: {
 				image->generate_mipmaps(false);
 				Image::CompressSource csource = Image::COMPRESS_SOURCE_LAYERED;
-				image->compress(p_vram_compression, csource, 0.7);
+				image->compress(p_vram_compression, csource, 0.95);
                 images.push_back(image);
 			} break;
 		}

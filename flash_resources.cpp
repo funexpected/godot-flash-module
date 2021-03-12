@@ -76,6 +76,57 @@ Color FlashElement::parse_color(const String &p_color) const {
     return Color::html(p_color.substr(1, p_color.length()));
 }
 
+FlashColorEffect FlashElement::parse_color_effect(Ref<XMLParser> xml) const {
+    FlashColorEffect color_effect;
+    if (xml->has_attribute("tintColor")) {
+            Color tint = parse_color(xml->get_attribute_value_safe("tintColor"));
+            float amount = xml->has_attribute("tintMultiplier") ?
+                xml->get_attribute_value_safe("tintMultiplier").to_float() : 0.0;
+
+            color_effect.add.r = tint.r * amount;
+            color_effect.add.g = tint.g * amount;
+            color_effect.add.b = tint.b * amount;
+            color_effect.mult.r = 1 - amount;
+            color_effect.mult.g = 1 - amount;
+            color_effect.mult.b = 1 - amount;
+    } else if (
+            xml->has_attribute("redMultiplier")
+        || xml->has_attribute("greenMultiplier")
+        || xml->has_attribute("blueMultiplier")
+        || xml->has_attribute("alphaMultiplier")
+        || xml->has_attribute("redOffset")
+        || xml->has_attribute("greenOffset")
+        || xml->has_attribute("blueOffset")
+        || xml->has_attribute("alphaOffset")
+    ) {
+        color_effect.mult.r = xml->has_attribute("redMultiplier") ? xml->get_attribute_value_safe("redMultiplier").to_float() : 1.0;
+        color_effect.mult.g = xml->has_attribute("greenMultiplier") ? xml->get_attribute_value_safe("greenMultiplier").to_float() : 1.0;
+        color_effect.mult.b = xml->has_attribute("blueMultiplier") ? xml->get_attribute_value_safe("blueMultiplier").to_float() : 1.0;
+        color_effect.mult.a = xml->has_attribute("alphaMultiplier") ? xml->get_attribute_value_safe("alphaMultiplier").to_float() : 1.0;
+        color_effect.add.r = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("redOffset").to_float()/255.0 : 0.0;
+        color_effect.add.g = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("greenOffset").to_float()/255.0 : 0.0;
+        color_effect.add.b = xml->has_attribute("blueOffset") ? xml->get_attribute_value_safe("blueOffset").to_float()/255.0 : 0.0;
+        color_effect.add.a = xml->has_attribute("alphaOffset") ? xml->get_attribute_value_safe("alphaOffset").to_float()/255.0 : 0.0;
+    } else if (xml->has_attribute("alphaMultiplier")) {
+        color_effect.mult.a = xml->get_attribute_value_safe("alphaMultiplier").to_float();
+    } else if (xml->has_attribute("brightness")) {
+        float b = xml->get_attribute_value_safe("brightness").to_float();
+        if (b < 0) {
+            color_effect.mult.r = 1 + b;
+            color_effect.mult.g = 1 + b;
+            color_effect.mult.b = 1 + b;
+        } else {
+            color_effect.mult.r = 1 - b;
+            color_effect.mult.g = 1 - b;
+            color_effect.mult.b = 1 - b;
+            color_effect.add.r = b;
+            color_effect.add.g = b;
+            color_effect.add.b = b;
+        }
+    }
+    return color_effect;
+}
+
 Transform2D FlashElement::parse_transform(Ref<XMLParser> xml) {
     ERR_FAIL_COND_V_MSG(xml->get_node_type() != XMLParser::NODE_ELEMENT, Transform2D(), "Not matrix node");
     ERR_FAIL_COND_V_MSG(xml->get_node_name() != "Matrix", Transform2D(), "Not Matrix node");
@@ -511,10 +562,10 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
     for (List<Ref<FlashDrawing>>::Element *E = current->elements.front(); E; E = E->next()) {
         Ref<FlashDrawing> elem = E->get();
         Transform2D tr = elem->get_transform();
-        FlashColorEffect effect;
+        FlashColorEffect effect = current->color_effect;
         FlashInstance *inst = Object::cast_to<FlashInstance>(elem.ptr());
         if (inst != NULL) {
-            effect = inst->color_effect;
+            effect = effect * inst->color_effect;
         }
         FlashColorEffect next_effect = effect;
 
@@ -526,8 +577,9 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
             Vector2 o = tr[2].linear_interpolate(to[2], interpolation);
             tr = Transform2D(x.x, x.y, y.x, y.y, o.x, o.y);
             FlashInstance *next_inst = Object::cast_to<FlashInstance>(next_elem.ptr());
+            next_effect = next->color_effect;
             if (next_inst != NULL) {
-                next_effect = next_inst->color_effect;
+                next_effect = next_effect * next_inst->color_effect;
             }
         }
         effect = effect.interpolate(next_effect, interpolation);
@@ -562,6 +614,8 @@ void FlashFrame::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_keymode", "keymode"), &FlashFrame::set_keymode);
     ClassDB::bind_method(D_METHOD("get_tween_type"), &FlashFrame::get_tween_type);
     ClassDB::bind_method(D_METHOD("set_tween_type", "tween_type"), &FlashFrame::set_tween_type);
+    ClassDB::bind_method(D_METHOD("get_color_effect"), &FlashFrame::get_color_effect);
+    ClassDB::bind_method(D_METHOD("set_color_effect", "color_effect"), &FlashFrame::set_color_effect);
     ClassDB::bind_method(D_METHOD("get_elements"), &FlashFrame::get_elements);
     ClassDB::bind_method(D_METHOD("set_elements", "elements"), &FlashFrame::set_elements);
     ClassDB::bind_method(D_METHOD("get_tweens"), &FlashFrame::get_tweens);
@@ -573,8 +627,30 @@ void FlashFrame::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "label_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_label_type", "get_label_type");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "keymode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_keymode", "get_keymode");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "tween_type", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tween_type", "get_tween_type");
+    ADD_PROPERTY(PropertyInfo(Variant::POOL_COLOR_ARRAY, "color_effect", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_color_effect", "get_color_effect");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "elements", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_elements", "get_elements");
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "tweens", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_tweens", "get_tweens");
+}
+PoolColorArray FlashFrame::get_color_effect() const {
+    PoolColorArray effect;
+    if (color_effect.is_empty()) {
+        return effect;
+    }
+    effect.push_back(color_effect.add);
+    effect.push_back(color_effect.mult);
+    return effect;
+}
+void FlashFrame::set_color_effect(PoolColorArray p_color_effect) {
+    if (p_color_effect.size() > 0) {
+        color_effect.add = p_color_effect[0];
+    } else {
+        color_effect.add = Color();
+    }
+    if (p_color_effect.size() > 1) {
+        color_effect.mult = p_color_effect[1];
+    } else {
+        color_effect.mult = Color(1,1,1,1);
+    }
 }
 Array FlashFrame::get_elements() {
     Array l;
@@ -638,6 +714,9 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
             elements.push_back(add_child<FlashBitmapInstance>(xml));
         else if (xml->get_node_name() == "CustomEase" || xml->get_node_name() == "Ease")
             tweens.push_back(add_child<FlashTween>(xml));
+        else if (xml->get_node_name() == "Color")
+            color_effect = parse_color_effect(xml);
+
     }
     if (tween_type == "motion" && tweens.size() == 0){
         Ref<FlashTween> linear = document->element<FlashTween>(this);
@@ -796,52 +875,7 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
                 transformation_point.y = xml->get_attribute_value_safe("y").to_float();
         }
         if (xml->get_node_name() == "Color") {
-            if (xml->has_attribute("tintColor")) {
-                Color tint = parse_color(xml->get_attribute_value_safe("tintColor"));
-                float amount = xml->has_attribute("tintMultiplier") ?
-                    xml->get_attribute_value_safe("tintMultiplier").to_float() : 0.0;
-
-                color_effect.add.r = tint.r * amount;
-                color_effect.add.g = tint.g * amount;
-                color_effect.add.b = tint.b * amount;
-                color_effect.mult.r = 1 - amount;
-                color_effect.mult.g = 1 - amount;
-                color_effect.mult.b = 1 - amount;
-            } else if (
-                   xml->has_attribute("redMultiplier")
-                || xml->has_attribute("greenMultiplier")
-                || xml->has_attribute("blueMultiplier")
-                || xml->has_attribute("alphaMultiplier")
-                || xml->has_attribute("redOffset")
-                || xml->has_attribute("greenOffset")
-                || xml->has_attribute("blueOffset")
-                || xml->has_attribute("alphaOffset")
-            ) {
-                color_effect.mult.r = xml->has_attribute("redMultiplier") ? xml->get_attribute_value_safe("redMultiplier").to_float() : 1.0;
-                color_effect.mult.g = xml->has_attribute("greenMultiplier") ? xml->get_attribute_value_safe("greenMultiplier").to_float() : 1.0;
-                color_effect.mult.b = xml->has_attribute("blueMultiplier") ? xml->get_attribute_value_safe("blueMultiplier").to_float() : 1.0;
-                color_effect.mult.a = xml->has_attribute("alphaMultiplier") ? xml->get_attribute_value_safe("alphaMultiplier").to_float() : 1.0;
-                color_effect.add.r = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("redOffset").to_float()/255.0 : 0.0;
-                color_effect.add.g = xml->has_attribute("greenOffset") ? xml->get_attribute_value_safe("greenOffset").to_float()/255.0 : 0.0;
-                color_effect.add.b = xml->has_attribute("blueOffset") ? xml->get_attribute_value_safe("blueOffset").to_float()/255.0 : 0.0;
-                color_effect.add.a = xml->has_attribute("alphaOffset") ? xml->get_attribute_value_safe("alphaOffset").to_float()/255.0 : 0.0;
-            } else if (xml->has_attribute("alphaMultiplier")) {
-                color_effect.mult.a = xml->get_attribute_value_safe("alphaMultiplier").to_float();
-            } else if (xml->has_attribute("brightness")) {
-                float b = xml->get_attribute_value_safe("brightness").to_float();
-                if (b < 0) {
-                    color_effect.mult.r = 1 + b;
-                    color_effect.mult.g = 1 + b;
-                    color_effect.mult.b = 1 + b;
-                } else {
-                    color_effect.mult.r = 1 - b;
-                    color_effect.mult.g = 1 - b;
-                    color_effect.mult.b = 1 - b;
-                    color_effect.add.r = b;
-                    color_effect.add.g = b;
-                    color_effect.add.b = b;
-                }
-            }
+            color_effect = parse_color_effect(xml);
         }
     }
     return Error::OK;
