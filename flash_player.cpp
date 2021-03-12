@@ -67,10 +67,10 @@ void FlashPlayer::_notification(int p_what) {
                 animation_process(delta);
                 if (animation_completed) {
 #ifndef TOOLS_ENABLED
-                    emit_signal("animation_completed");
+                    call_deferred("emit_signal", "animation_completed");
 #else
                     if (!Engine::get_singleton()->is_editor_hint())
-                        emit_signal("animation_completed");
+                        call_deferred("emit_signal", "animation_completed");
 #endif
 
                 }
@@ -357,7 +357,7 @@ String FlashPlayer::get_active_clip() const {
     return active_clip == String() ? "[full]" : active_clip;
 }
 
-void FlashPlayer::animation_process(float duration) {
+void FlashPlayer::animation_process(float delta) {
     if (processed_frame == frame)
         return;
     events.clear();
@@ -375,7 +375,7 @@ void FlashPlayer::animation_process(float duration) {
         return;
     }
 
-    active_symbol->animation_process(this, frame, duration);
+    active_symbol->animation_process(this, frame, delta);
     update();
     performance_triangles_generated = indices.size() / 3;
 
@@ -405,9 +405,13 @@ void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, 
     }
 }
 
-void FlashPlayer::queue_animation_event(const String &p_event) {
+void FlashPlayer::queue_animation_event(const String &p_event, bool p_reversed) {
     if (events.find(p_event) == NULL) {
-        events.push_back(p_event);
+        if (p_reversed) {
+            events.push_front(p_event);
+        } else {
+            events.push_back(p_event);
+        }
     }
 }
 

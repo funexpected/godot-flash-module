@@ -326,9 +326,9 @@ Error FlashDocument::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashDocument::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+void FlashDocument::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     for (List<Ref<FlashTimeline>>::Element *E = timelines.front(); E; E = E->next()) {
-        E->get()->animation_process(node, time, duration, tr, effect);
+        E->get()->animation_process(node, time, delta, tr, effect);
     }
 }
 
@@ -462,30 +462,26 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashTimeline::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
-    if (events.size()) {
+void FlashTimeline::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
+    if (events.size() && delta > 0.0) {
         float event_frame_start = -2.0;
         float event_frame_end = -2.0;
         float current_frame = floor(time);
-        float prev_frame = floor(time-duration);
+        float prev_frame = floor(time-delta);
 
-        // always check events for frame after switching animation by code
-        if (duration == 0.0) {
-            event_frame_start = current_frame - 1;
-            event_frame_end = current_frame;
-        } else if (current_frame != prev_frame) {
+        if (current_frame != prev_frame) {
             event_frame_start = prev_frame;
             event_frame_end = current_frame;
-        }
 
-        if (event_frame_start >= -1.0) {
             for (int i=0; i<events.size(); i++) {
                 String event = events.get_key_at_index(i);
                 PoolRealArray timings = events.get_value_at_index(i);
                 for (int j=0; j<timings.size(); j++) {
                     float timestamp = timings[j];
-                    if (timestamp > event_frame_start && timestamp <= event_frame_end) {
+                    if (event_frame_start >= 0 && timestamp >= event_frame_start && timestamp < event_frame_end) {
                         node->queue_animation_event(event);
+                    } else if (event_frame_start < 0 && (timestamp >= duration + event_frame_start || timestamp < event_frame_end)) {
+                        node->queue_animation_event(event, true);
                     }
                 }
             }
@@ -579,13 +575,13 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 };
-void FlashLayer::animation_process(FlashPlayer* node, float time, float p_duration, Transform2D parent_transform, FlashColorEffect parent_effect) {
+void FlashLayer::animation_process(FlashPlayer* node, float time, float delta, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
     if (type == "folder") return;
     if (type == "mask") node->mask_begin(get_eid());
     if (mask_id) node->clip_begin(mask_id);
 
-    float frame_time = time;// / document->get_frame_size();
+    float frame_time = time;
     while (duration > 0 && frame_time > duration) frame_time -= duration;
     int frame_idx = static_cast<int>(floor(frame_time));
 
@@ -635,7 +631,7 @@ void FlashLayer::animation_process(FlashPlayer* node, float time, float p_durati
         effect = effect.interpolate(next_effect, interpolation);
 
 
-        elem->animation_process(node, frame_time - current->get_index(), p_duration, parent_transform * tr, parent_effect*effect);
+        elem->animation_process(node, frame_time - current->get_index(), delta, parent_transform * tr, parent_effect*effect);
         idx++;
     }
     if (type == "mask") node->mask_end(get_eid());
@@ -648,7 +644,7 @@ void FlashDrawing::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_transform", "get_transform");
 }
-void FlashDrawing::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+void FlashDrawing::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
 }
 
 void FlashFrame::_bind_methods() {
@@ -859,10 +855,10 @@ Error FlashGroup::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashGroup::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+void FlashGroup::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     List<Ref<FlashDrawing>> ms = all_members();
     for (List<Ref<FlashDrawing>>::Element *E = ms.front(); E; E = E->next()) {
-        E->get()->animation_process(node, time, duration, tr, effect);
+        E->get()->animation_process(node, time, delta, tr, effect);
     }
 }
 
@@ -939,7 +935,7 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashInstance::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+void FlashInstance::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     FlashTimeline* tl = get_timeline();
     if (tl == NULL) return;
     float instance_time =
@@ -949,7 +945,7 @@ void FlashInstance::animation_process(FlashPlayer* node, float time, float durat
 
     instance_time = node->get_symbol_frame(timeline_token, instance_time);
 
-    tl->animation_process(node, instance_time, duration, tr, effect);
+    tl->animation_process(node, instance_time, delta, tr, effect);
 
 }
 
@@ -980,7 +976,7 @@ Ref<FlashTextureRect> FlashBitmapInstance::get_texture() {
     return texture;
 }
 
-void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     Ref<FlashTextureRect> tex = get_texture();
     if (!tex.is_valid()) {
         return;

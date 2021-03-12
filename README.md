@@ -23,8 +23,8 @@ scons -j8
 - [ ] Shapes
 - [x] Name Labels (for splitting single animation to multiply parts)
 - [x] Anchor Labels (for skinning, e.g. forcing custom frames in target symbols)
-- [ ] Comment Labels (for user-defined signals)
-- [ ] Predefined signals (e.g. `animation_completed`,` timeline_changed`)
+- [x] User-defined signals (`animation_event` using comment-labels)
+- [x] Predefined signals (`animation_completed`)
 - [x] Looping (loop, once, single frame)
 - [x] Color effects
 - [x] Tweening (for properties together)

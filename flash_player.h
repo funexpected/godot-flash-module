@@ -114,10 +114,10 @@ public:
     void set_active_clip(String p_clip);
 
     // batcher part
-    void animation_process(float duration=0);
+    void animation_process(float delta=0);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
-    void queue_animation_event(const String &p_name);
+    void queue_animation_event(const String &p_name, bool p_reversed=false);
 
     bool is_masking();
     void mask_begin(int layer);

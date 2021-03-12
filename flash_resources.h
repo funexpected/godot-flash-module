@@ -175,7 +175,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> parser);
-    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 };
 
@@ -241,7 +241,7 @@ public:
     void add_label(const String &name, const String &label_type, float start, float duration);
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashLayer: public FlashElement {
@@ -283,7 +283,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 };
 
@@ -298,7 +298,7 @@ public:
     static void _bind_methods();
     Transform2D get_transform() const { return transform; }
     void set_transform(Transform2D p_transform) { transform = p_transform; }
-    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashFrame: public FlashElement {
@@ -349,7 +349,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 
 };
@@ -394,7 +394,7 @@ public:
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     FlashTimeline* get_timeline();
     virtual Error parse(Ref<XMLParser> xml);
-    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashShape: public FlashDrawing {
@@ -418,7 +418,7 @@ public:
     List<Ref<FlashDrawing>> all_members() const;
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 
@@ -441,7 +441,7 @@ public:
     void set_library_item_name(String p_library_item_name) { library_item_name = p_library_item_name; }
 
     Error parse(Ref<XMLParser> xml);
-    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float delta, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashTween: public FlashElement {
