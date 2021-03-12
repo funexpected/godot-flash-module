@@ -48,21 +48,22 @@ class FlashPlayer: public Node2D {
     float playback_start;
     float playback_end;
     Ref<FlashDocument> resource;
-    String active_timeline_name;
-    Ref<FlashTimeline> active_timeline;
-    String active_label;
+    String active_symbol_name;
+    Ref<FlashTimeline> active_symbol;
+    String active_clip;
     bool loop;
     RID flash_material;
     RID mesh;
     static RID flash_shader;
 
     // batcher part
-    float batched_frame;
+    float processed_frame;
     int cliping_depth;
     Vector<Vector2> points;
     Vector<Vector2> uvs;
     Vector<Color> colors;
     Vector<int> indices;
+    List<String> events;
 
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
@@ -74,6 +75,7 @@ class FlashPlayer: public Node2D {
     List<FlashMaskItem> clipping_items;
     int current_mask;
 
+
     int performance_triangles_drawn;
 	int performance_triangles_generated;
 
@@ -84,7 +86,7 @@ protected:
 	void _get_property_list(List<PropertyInfo> *p_list) const;
     virtual void _validate_property(PropertyInfo &prop) const;
 	static void _bind_methods();
-    bool _sort_labels(Variant a, Variant b) const;
+    bool _sort_clips(Variant a, Variant b) const;
 
 public:
     FlashPlayer();
@@ -105,16 +107,17 @@ public:
     void set_loop(bool p_loop) { loop = p_loop; }
     Ref<FlashDocument> get_resource() const;
     void set_resource(const Ref<FlashDocument> &doc);
-    float get_duration(String timeline=String(), String label=String());
-    String get_active_timeline() const;
-    void set_active_timeline(String p_timeline);
-    String get_active_label() const;
-    void set_active_label(String p_label);
+    float get_duration(String symbol=String(), String label=String());
+    String get_active_symbol() const;
+    void set_active_symbol(String p_symbol);
+    String get_active_clip() const;
+    void set_active_clip(String p_clip);
 
-    //batcher part
-    void batch();
+    // batcher part
+    void animation_process(float duration=0);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
+    void queue_animation_event(const String &p_name);
 
     bool is_masking();
     void mask_begin(int layer);

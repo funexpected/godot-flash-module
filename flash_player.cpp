@@ -26,6 +26,10 @@
 
 #include "flash_player.h"
 
+#ifdef TOOLS_ENABLED
+#include <core/engine.h>
+#endif
+
 RID FlashPlayer::flash_shader = RID();
 
 void FlashPlayer::_notification(int p_what) {
@@ -51,7 +55,8 @@ void FlashPlayer::_notification(int p_what) {
             performance_triangles_generated = 0;
             if (playing) {
                 bool animation_completed = false;
-                frame += get_process_delta_time()*frame_rate;
+                float delta = get_process_delta_time()*frame_rate;
+                frame += delta;
                 if (!loop && frame > playback_end) {
                     animation_completed = true;
                     frame = playback_end - 0.0001;
@@ -59,15 +64,21 @@ void FlashPlayer::_notification(int p_what) {
                     animation_completed = true;
                     frame -= playback_end - playback_start;
                 }
-                batch();
+                animation_process(delta);
                 if (animation_completed) {
+#ifndef TOOLS_ENABLED
                     emit_signal("animation_completed");
+#else
+                    if (!Engine::get_singleton()->is_editor_hint())
+                        emit_signal("animation_completed");
+#endif
+
                 }
             }
         } break;
 
         case NOTIFICATION_DRAW: {
-            if (active_timeline.is_valid() && points.size() > 0 && resource.is_valid()) {
+            if (active_symbol.is_valid() && points.size() > 0 && resource.is_valid()) {
                 update_clipping_data();
                 VisualServer::get_singleton()->mesh_clear(mesh);
                 Array arrays;
@@ -97,10 +108,10 @@ void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
     //ERR_FAIL_COND_MSG(resource.is_null(), "Can't override symbol without resource");
     if (p_value.get_type() == Variant::NIL && frame_overrides.has(p_symbol)) {
         frame_overrides.erase(p_symbol);
-        batch();
+        animation_process();
     } else if (p_value.get_type() == Variant::REAL || p_value.get_type() == Variant::INT) {
         frame_overrides[p_symbol] = p_value;
-        batch();
+        animation_process();
     }
 }
 void FlashPlayer::set_variant(String variant, Variant value) {
@@ -110,15 +121,14 @@ void FlashPlayer::set_variant(String variant, Variant value) {
     } else {
         active_variants[variant] = value;
         if (!resource.is_valid()) return;
-        Ref<FlashTimeline> timeline = resource->get_symbols().get(variant, Variant());
-        if (timeline.is_valid()) {
-            Dictionary labels = timeline->get_labels();
-            Vector2 label = labels.get(value, Vector2());
+        Ref<FlashTimeline> symbol = resource->get_symbols().get(variant, Variant());
+        if (symbol.is_valid()) {
+            Dictionary variants = symbol->get_variants();
             variant = variant.replace("    ", "/");
-            frame_overrides[variant] = label.x;
+            frame_overrides[variant] = variants.get(value, 0);
         }
     }
-    batch();
+    animation_process();
 }
 String FlashPlayer::get_variant(String variant) const {
     return active_variants.has(variant) ? active_variants[variant] : "[default]";
@@ -175,7 +185,7 @@ void FlashPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 }
 
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
-    if (prop.name == "active_timeline"){
+    if (prop.name == "active_symbol"){
         String symbols_hint = "[document]";
         if (resource.is_valid()) {
             Array symbols = resource->get_symbols().values();
@@ -188,23 +198,23 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
         prop.hint_string = symbols_hint;
     }
 
-    if (prop.name == "active_label") {
-        String labels_hint = "[full]";
-        if (active_timeline.is_valid()) {
-            Array labels = active_timeline->get_labels().keys();
-            if (labels.size() > 0) {
+    if (prop.name == "active_clip") {
+        String clips_hint = "[full]";
+        if (active_symbol.is_valid()) {
+            Array clips = active_symbol->get_clips().keys();
+            if (clips.size() > 0) {
                 prop.usage = PROPERTY_USAGE_DEFAULT;
             } else {
                 prop.usage = PROPERTY_USAGE_NOEDITOR;
                 return;
             }
 
-            labels.sort_custom((FlashPlayer*)this, "_sort_labels");
-            for (int i=0; i<labels.size(); i++){
-                String label = labels[i];
-                labels_hint += "," + label;
+            clips.sort_custom((FlashPlayer*)this, "_sort_clips");
+            for (int i=0; i<clips.size(); i++){
+                String clip = clips[i];
+                clips_hint += "," + clip;
             }
-            prop.hint_string = labels_hint;
+            prop.hint_string = clips_hint;
         } else {
             prop.usage = PROPERTY_USAGE_NOEDITOR;
         }
@@ -215,30 +225,30 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
     }
 
 }
-bool FlashPlayer::_sort_labels(Variant a, Variant b) const {
-    if (!active_timeline.is_valid()) return false;
-    Vector2 da = active_timeline->get_labels()[a];
-    Vector2 db = active_timeline->get_labels()[b];
+bool FlashPlayer::_sort_clips(Variant a, Variant b) const {
+    if (!active_symbol.is_valid()) return false;
+    Vector2 da = active_symbol->get_clips()[a];
+    Vector2 db = active_symbol->get_clips()[b];
     return da.x < db.x;
 }
 
 void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
-    if (doc != resource) active_timeline_name = "[document]";
+    if (doc != resource) active_symbol_name = "[document]";
     resource = doc;
     frame = 0;
-    batched_frame = -1;
+    processed_frame = -1;
     playback_start = 0;
     playback_end = 0;
     frame_overrides.clear();
     active_variants.clear();
     if (resource.is_valid()) {
-        active_timeline = resource->get_main_timeline();
-        if (active_timeline.is_valid())
-            playback_end = active_timeline->get_duration();
+        active_symbol = resource->get_main_timeline();
+        if (active_symbol.is_valid())
+            playback_end = active_symbol->get_duration();
         VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
         VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
     }
-    batch();
+    animation_process();
     _change_notify();
 }
 
@@ -262,102 +272,123 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_resource", "resource"), &FlashPlayer::set_resource);
     ClassDB::bind_method(D_METHOD("get_resource"), &FlashPlayer::get_resource);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashPlayer::get_duration, DEFVAL(String()), DEFVAL(String()));
-    ClassDB::bind_method(D_METHOD("set_active_timeline", "active_timeline"), &FlashPlayer::set_active_timeline);
-    ClassDB::bind_method(D_METHOD("get_active_timeline"), &FlashPlayer::get_active_timeline);
-    ClassDB::bind_method(D_METHOD("set_active_label", "active_label"), &FlashPlayer::set_active_label);
-    ClassDB::bind_method(D_METHOD("get_active_label"), &FlashPlayer::get_active_label);
+    ClassDB::bind_method(D_METHOD("set_active_symbol", "active_symbol"), &FlashPlayer::set_active_symbol);
+    ClassDB::bind_method(D_METHOD("get_active_symbol"), &FlashPlayer::get_active_symbol);
+    ClassDB::bind_method(D_METHOD("set_active_clip", "active_clip"), &FlashPlayer::set_active_clip);
+    ClassDB::bind_method(D_METHOD("get_active_clip"), &FlashPlayer::get_active_clip);
 
-    ClassDB::bind_method(D_METHOD("_sort_labels"), &FlashPlayer::_sort_labels);
+    ClassDB::bind_method(D_METHOD("_sort_clips"), &FlashPlayer::_sort_clips);
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing", PROPERTY_HINT_NONE, ""), "set_playing", "is_playing");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop", PROPERTY_HINT_NONE, ""), "set_loop", "is_loop");
     ADD_PROPERTY(PropertyInfo(Variant::REAL, "frame_rate", PROPERTY_HINT_NONE, ""), "set_frame_rate", "get_frame_rate");
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "resource", PROPERTY_HINT_RESOURCE_TYPE, "FlashDocument"), "set_resource", "get_resource");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, ""), "set_active_timeline", "get_active_timeline");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, ""), "set_active_label", "get_active_label");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_symbol", PROPERTY_HINT_ENUM, ""), "set_active_symbol", "get_active_symbol");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
 
     ADD_SIGNAL(MethodInfo("animation_completed"));
+    ADD_SIGNAL(MethodInfo("animation_event", PropertyInfo(Variant::STRING, "name")));
+
+    // compatiblity
+    ClassDB::bind_method(D_METHOD("set_active_label", "active_label"), &FlashPlayer::set_active_clip);
+    ClassDB::bind_method(D_METHOD("get_active_label"), &FlashPlayer::get_active_clip);
+    ClassDB::bind_method(D_METHOD("set_active_timeline", "active_timeline"), &FlashPlayer::set_active_symbol);
+    ClassDB::bind_method(D_METHOD("get_active_timeline"), &FlashPlayer::get_active_symbol);
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_label", "get_active_label");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_timeline", "get_active_timeline");
+
 }
 
-float FlashPlayer::get_duration(String p_timeline, String p_label) {
+float FlashPlayer::get_duration(String p_symbol, String p_clip) {
     if (!resource.is_valid()) return 0;
-    return resource->get_duration(p_timeline, p_label);
+    return resource->get_duration(p_symbol, p_clip);
 }
 
-void FlashPlayer::set_active_timeline(String p_value) {
+void FlashPlayer::set_active_symbol(String p_value) {
     if (p_value == "[document]") p_value = "";
-    active_timeline_name = p_value;
-    active_label = "";
+    active_symbol_name = p_value;
+    active_clip = "";
     frame = 0;
-    batched_frame = -1;
+    processed_frame = -1;
     playback_start = 0;
-    if (resource.is_valid() && resource->get_symbols().has(active_timeline_name)) {
-        active_timeline = resource->get_symbols()[active_timeline_name];
+    if (resource.is_valid() && resource->get_symbols().has(active_symbol_name)) {
+        active_symbol = resource->get_symbols()[active_symbol_name];
     } else if (resource.is_valid()){
-        active_timeline = resource->get_main_timeline();
+        active_symbol = resource->get_main_timeline();
     } else {
-        active_timeline_name = "";
+        active_symbol_name = "";
     }
 
-    if (active_timeline.is_valid()) {
-        playback_end = active_timeline->get_duration();
+    if (active_symbol.is_valid()) {
+        playback_end = active_symbol->get_duration();
     } else {
         playback_end = 0;
     }
-    batch();
+    animation_process();
     _change_notify();
 }
-String FlashPlayer::get_active_timeline() const {
-    return active_timeline_name == String() ? "[document]" : active_timeline_name;
+String FlashPlayer::get_active_symbol() const {
+    return active_symbol_name == String() ? "[document]" : active_symbol_name;
 }
 
-void FlashPlayer::set_active_label(String p_value) {
+void FlashPlayer::set_active_clip(String p_value) {
     if (p_value == "[full]") p_value = "";
-    active_label = p_value;
-    if (active_timeline.is_valid()) {
-        Dictionary labels = active_timeline->get_labels();
-        if (labels.has(p_value)) {
-            Vector2 label = labels[p_value];
-            playback_start = label.x;
-            playback_end = label.y;
+    active_clip = p_value;
+    if (active_symbol.is_valid()) {
+        Dictionary clips = active_symbol->get_clips();
+        if (clips.has(p_value)) {
+            Vector2 clip = clips[p_value];
+            playback_start = clip.x;
+            playback_end = clip.y;
 
         } else {
             playback_start = 0;
-            playback_end = active_timeline->get_duration();
+            playback_end = active_symbol->get_duration();
         }
         frame = playback_start;
     } else {
-        active_label = "";
+        active_clip = "";
     }
-    batch();
+    animation_process();
     update();
 }
 
-String FlashPlayer::get_active_label() const {
-    return active_label == String() ? "[full]" : active_label;
+String FlashPlayer::get_active_clip() const {
+    return active_clip == String() ? "[full]" : active_clip;
 }
 
-void FlashPlayer::batch() {
-    if (batched_frame == frame)
+void FlashPlayer::animation_process(float duration) {
+    if (processed_frame == frame)
         return;
+    events.clear();
     masks.clear();
     clipping_cache.clear();
     clipping_items.clear();
-    batched_frame = frame;
+    processed_frame = frame;
     indices.resize(0);
     points.resize(0);
     colors.resize(0);
     uvs.resize(0);
 
-    if (!active_timeline.is_valid()) {
+    if (!active_symbol.is_valid()) {
         update();
         return;
     }
 
-    active_timeline->batch(this, frame);
+    active_symbol->animation_process(this, frame, duration);
     update();
     performance_triangles_generated = indices.size() / 3;
 
+    for (List<String>::Element *E = events.front(); E; E = E->next()) {
+        // always emit user events in deferred mode
+        // to prevent recursive `animation_process` invocation
+#ifndef TOOLS_ENABLED
+        call_deferred("emit_signal", "animation_event", E->get());
+#else
+        if (!Engine::get_singleton()->is_editor_hint())
+            call_deferred("emit_signal", "animation_event", E->get());
+#endif
+    }
 }
 
 void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx) {
@@ -371,6 +402,12 @@ void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, 
         points.push_back(p_points[i]);
         colors.push_back(p_colors[i]);
         uvs.push_back(p_uvs[i] * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
+    }
+}
+
+void FlashPlayer::queue_animation_event(const String &p_event) {
+    if (events.find(p_event) == NULL) {
+        events.push_back(p_event);
     }
 }
 
@@ -468,11 +505,11 @@ FlashPlayer::FlashPlayer() {
     playing = false;
     playback_start = 0;
     playback_end = 0;
-    active_timeline_name = "[document]";
-    active_label = "";
+    active_symbol_name = "[document]";
+    active_clip = "";
     loop = false;
 
-    batched_frame = -1;
+    processed_frame = -1;
     current_mask = 0;
     cliping_depth = 0;
 

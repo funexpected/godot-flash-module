@@ -202,8 +202,8 @@ void FlashDocument::set_timelines(Array p_timelines) {
 float FlashDocument::get_duration(String timeline, String label) {
     Ref<FlashTimeline> tl = get_main_timeline();
     if (timeline != String() && symbols.has(timeline)) tl = symbols[timeline];
-    if (label == String() || !tl->get_labels().has(label)) return tl->get_duration();
-    Vector2 lb = tl->get_labels()[label];
+    if (label == String() || !tl->get_clips().has(label)) return tl->get_duration();
+    Vector2 lb = tl->get_clips()[label];
     return lb.y - lb.x;
 }
 Dictionary FlashDocument::get_variants() const {
@@ -220,7 +220,7 @@ void FlashDocument::cache_variants() {
             for (List<Ref<FlashFrame>>::Element *F = layer->frames.front(); F; F = F->next()) {
                 Ref<FlashFrame> frame = F->get();
 
-                if (frame->label_type != String()) {
+                if (frame->label_type == "anchor") {
                     Array variants_for_instance;
                     if (variants.has(token)) {
                         variants_for_instance = variants[token];
@@ -326,9 +326,9 @@ Error FlashDocument::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashDocument::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashDocument::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
     for (List<Ref<FlashTimeline>>::Element *E = timelines.front(); E; E = E->next()) {
-        E->get()->batch(node, time, tr, effect);
+        E->get()->animation_process(node, time, duration, tr, effect);
     }
 }
 
@@ -351,8 +351,12 @@ Error FlashBitmapItem::parse(Ref<XMLParser> xml) {
 void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_layers"), &FlashTimeline::get_layers);
     ClassDB::bind_method(D_METHOD("set_layers", "layers"), &FlashTimeline::set_layers);
-    ClassDB::bind_method(D_METHOD("get_labels"), &FlashTimeline::get_labels);
-    ClassDB::bind_method(D_METHOD("set_labels", "labels"), &FlashTimeline::set_labels);
+    ClassDB::bind_method(D_METHOD("get_variants"), &FlashTimeline::get_variants);
+    ClassDB::bind_method(D_METHOD("set_variants", "variants"), &FlashTimeline::set_variants);
+    ClassDB::bind_method(D_METHOD("get_clips"), &FlashTimeline::get_clips);
+    ClassDB::bind_method(D_METHOD("set_clips", "clips"), &FlashTimeline::set_clips);
+    ClassDB::bind_method(D_METHOD("get_events"), &FlashTimeline::get_events);
+    ClassDB::bind_method(D_METHOD("set_events", "labels"), &FlashTimeline::set_events);
     ClassDB::bind_method(D_METHOD("get_token"), &FlashTimeline::get_token);
     ClassDB::bind_method(D_METHOD("set_token", "token"), &FlashTimeline::set_token);
     ClassDB::bind_method(D_METHOD("get_local_path"), &FlashTimeline::get_local_path);
@@ -361,7 +365,9 @@ void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashTimeline::set_duration);
 
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "layers", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_layers", "get_layers");
-    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "labels", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_labels", "get_labels");
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "variants", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_variants", "get_variants");
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "clips", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_clips", "get_clips");
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "events", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_events", "get_events");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "token", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_token", "get_token");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "local_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_local_path", "get_local_path");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_duration", "get_duration");
@@ -397,8 +403,23 @@ Ref<FlashLayer> FlashTimeline::get_layer(int index) {
     }
     return Ref<FlashLayer>();
 }
-void FlashTimeline::add_label(String name, float start, float duration) {
-    labels[name] = Vector2(start, start+duration);
+void FlashTimeline::add_label(const String &name, const String &label_type, float start, float duration) {
+    if (label_type == "anchor") {
+        variants[name] = start;
+    } else if (label_type == "comment") {
+        PoolRealArray timings;
+        if (events.has(name)) {
+            timings = events[name];
+        } else {
+            events[name] = timings;
+        }
+        timings.push_back(start);
+        events[name] = timings;
+        //events[name] = Vector2(start, start+duration);
+    } else {
+        clips[name] = Vector2(start, start+duration);
+    }
+    //labels[name] = Vector2(start, start+duration);
 }
 void FlashTimeline::setup(FlashDocument *p_document, FlashElement *p_parent) {
     FlashElement::setup(p_document, p_parent);
@@ -441,12 +462,41 @@ Error FlashTimeline::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashTimeline::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashTimeline::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
+    if (events.size()) {
+        float event_frame_start = -2.0;
+        float event_frame_end = -2.0;
+        float current_frame = floor(time);
+        float prev_frame = floor(time-duration);
+
+        // always check events for frame after switching animation by code
+        if (duration == 0.0) {
+            event_frame_start = current_frame - 1;
+            event_frame_end = current_frame;
+        } else if (current_frame != prev_frame) {
+            event_frame_start = prev_frame;
+            event_frame_end = current_frame;
+        }
+
+        if (event_frame_start >= -1.0) {
+            for (int i=0; i<events.size(); i++) {
+                String event = events.get_key_at_index(i);
+                PoolRealArray timings = events.get_value_at_index(i);
+                for (int j=0; j<timings.size(); j++) {
+                    float timestamp = timings[j];
+                    if (timestamp > event_frame_start && timestamp <= event_frame_end) {
+                        node->queue_animation_event(event);
+                    }
+                }
+            }
+        }
+    }
+
     for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
-        E->get()->batch(node, time, tr, effect);
+        E->get()->animation_process(node, time, duration, tr, effect);
     }
     for (List<Ref<FlashLayer>>::Element *E = layers.back(); E; E = E->prev()) {
-        E->get()->batch(node, time, tr, effect);
+        E->get()->animation_process(node, time, duration, tr, effect);
     }
 }
 
@@ -529,7 +579,7 @@ Error FlashLayer::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 };
-void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transform, FlashColorEffect parent_effect) {
+void FlashLayer::animation_process(FlashPlayer* node, float time, float p_duration, Transform2D parent_transform, FlashColorEffect parent_effect) {
     if (type == "guide") return;
     if (type == "folder") return;
     if (type == "mask") node->mask_begin(get_eid());
@@ -585,7 +635,7 @@ void FlashLayer::batch(FlashPlayer* node, float time, Transform2D parent_transfo
         effect = effect.interpolate(next_effect, interpolation);
 
 
-        elem->batch(node, frame_time - current->get_index(), parent_transform * tr, parent_effect*effect);
+        elem->animation_process(node, frame_time - current->get_index(), p_duration, parent_transform * tr, parent_effect*effect);
         idx++;
     }
     if (type == "mask") node->mask_end(get_eid());
@@ -598,7 +648,7 @@ void FlashDrawing::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "set_transform", "get_transform");
 }
-void FlashDrawing::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashDrawing::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
 }
 
 void FlashFrame::_bind_methods() {
@@ -698,7 +748,11 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (xml->has_attribute("keymode")) keymode = xml->get_attribute_value_safe("keymode");
     if (xml->has_attribute("tweenType")) tween_type = xml->get_attribute_value_safe("tweenType");
     if (xml->has_attribute("name")) frame_name = xml->get_attribute_value_safe("name").strip_edges(true, true);
-    if (xml->has_attribute("labelType")) label_type = xml->get_attribute_value_safe("labelType");
+    if (xml->has_attribute("labelType")) {
+        label_type = xml->get_attribute_value_safe("labelType");
+    } else {
+        label_type = "name";
+    }
     if (xml->is_empty()) return Error::OK;
     while (xml->read() == Error::OK) {
         if (xml->get_node_type() == XMLParser::NODE_TEXT) continue;
@@ -725,16 +779,21 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     if (frame_name != "") {
         FlashTimeline *tl = find_parent<FlashTimeline>();
         if (tl != NULL) {
-            tl->add_label(frame_name, index, duration);
+            tl->add_label(frame_name, label_type, index, duration);
         }
     }
     return Error::OK;
 }
 
 Error FlashShape::parse(Ref<XMLParser> xml) {
-    String layer_name = find_parent<FlashLayer>()->get_layer_name();
-    int frame_idx = find_parent<FlashFrame>()->get_index();
-    ERR_FAIL_V_MSG(FAILED, String("Vector Shape not supported at ") + xml->get_meta("path") + " in layer '" + layer_name + "' at frame " + itos(frame_idx));
+    return FAILED;
+    //// Even if there visible shapes in document or symbols,
+    //// it should never be rendered if doc has been exported
+    //// with Funexpected Flash Tools
+    //// TODO: report error in `FlashShape::animation_process` calls instead
+    // String layer_name = find_parent<FlashLayer>()->get_layer_name();
+    // int frame_idx = find_parent<FlashFrame>()->get_index();
+    // ERR_FAIL_V_MSG(FAILED, String("Vector Shape not supported at ") + xml->get_meta("path") + " in layer '" + layer_name + "' at frame " + itos(frame_idx));
 }
 
 void FlashGroup::_bind_methods() {
@@ -800,10 +859,10 @@ Error FlashGroup::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashGroup::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashGroup::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
     List<Ref<FlashDrawing>> ms = all_members();
     for (List<Ref<FlashDrawing>>::Element *E = ms.front(); E; E = E->next()) {
-        E->get()->batch(node, time, tr, effect);
+        E->get()->animation_process(node, time, duration, tr, effect);
     }
 }
 
@@ -880,7 +939,7 @@ Error FlashInstance::parse(Ref<XMLParser> xml) {
     }
     return Error::OK;
 }
-void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashInstance::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
     FlashTimeline* tl = get_timeline();
     if (tl == NULL) return;
     float instance_time =
@@ -890,7 +949,7 @@ void FlashInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashCo
 
     instance_time = node->get_symbol_frame(timeline_token, instance_time);
 
-    tl->batch(node, instance_time, tr, effect);
+    tl->animation_process(node, instance_time, duration, tr, effect);
 
 }
 
@@ -921,7 +980,7 @@ Ref<FlashTextureRect> FlashBitmapInstance::get_texture() {
     return texture;
 }
 
-void FlashBitmapInstance::batch(FlashPlayer* node, float time, Transform2D tr, FlashColorEffect effect) {
+void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float duration, Transform2D tr, FlashColorEffect effect) {
     Ref<FlashTextureRect> tex = get_texture();
     if (!tex.is_valid()) {
         return;

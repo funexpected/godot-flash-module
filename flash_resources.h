@@ -175,7 +175,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> parser);
-    void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 };
 
@@ -208,7 +208,9 @@ class FlashTimeline: public FlashElement {
     String token;
     String local_path;
     int duration;
-    Dictionary labels;
+    Dictionary clips;
+    Dictionary events;
+    Dictionary variants;
     List<Ref<FlashLayer>> layers;
     List<Ref<FlashLayer>> masks;
 
@@ -226,16 +228,20 @@ public:
     void set_local_path(String p_local_path) { local_path = p_local_path; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
-    Dictionary get_labels() const { return labels; }
-    void set_labels(Dictionary p_labels) { labels = p_labels; }
+    Dictionary get_variants() const { return variants; }
+    void set_variants(Dictionary p_variants) { variants = p_variants; }
+    Dictionary get_clips() const { return clips; }
+    void set_clips(Dictionary p_clips) { clips = p_clips; }
+    Dictionary get_events() const { return events; }
+    void set_events(Dictionary p_events) { events = p_events; }
     Array get_layers();
     void set_layers(Array p_layers);
 
     Ref<FlashLayer> get_layer(int idx);
-    void add_label(String name, float start, float duration);
+    void add_label(const String &name, const String &label_type, float start, float duration);
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashLayer: public FlashElement {
@@ -277,7 +283,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 };
 
@@ -292,7 +298,7 @@ public:
     static void _bind_methods();
     Transform2D get_transform() const { return transform; }
     void set_transform(Transform2D p_transform) { transform = p_transform; }
-    virtual void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashFrame: public FlashElement {
@@ -343,7 +349,7 @@ public:
 
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 
 
 };
@@ -388,7 +394,7 @@ public:
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     FlashTimeline* get_timeline();
     virtual Error parse(Ref<XMLParser> xml);
-    virtual void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashShape: public FlashDrawing {
@@ -412,7 +418,7 @@ public:
     List<Ref<FlashDrawing>> all_members() const;
     virtual void setup(FlashDocument *p_document, FlashElement *p_parent);
     virtual Error parse(Ref<XMLParser> xml);
-    virtual void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 
@@ -435,7 +441,7 @@ public:
     void set_library_item_name(String p_library_item_name) { library_item_name = p_library_item_name; }
 
     Error parse(Ref<XMLParser> xml);
-    virtual void batch(FlashPlayer* node, float time, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
+    virtual void animation_process(FlashPlayer* node, float time, float duration, Transform2D tr=Transform2D(), FlashColorEffect effect=FlashColorEffect());
 };
 
 class FlashTween: public FlashElement {
