@@ -78,8 +78,9 @@ Color FlashElement::parse_color(const String &p_color) const {
 
 FlashColorEffect FlashElement::parse_color_effect(Ref<XMLParser> xml) const {
     FlashColorEffect color_effect;
-    if (xml->has_attribute("tintColor")) {
-            Color tint = parse_color(xml->get_attribute_value_safe("tintColor"));
+    if (xml->has_attribute("tintColor") || xml->has_attribute("tintMultiplier")) {
+            Color tint = xml->has_attribute("tintColor") ?
+                parse_color(xml->get_attribute_value_safe("tintColor")) : Color(0, 0, 0, 1);
             float amount = xml->has_attribute("tintMultiplier") ?
                 xml->get_attribute_value_safe("tintMultiplier").to_float() : 0.0;
 
