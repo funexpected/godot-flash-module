@@ -154,7 +154,12 @@ String FlashPlayer::get_variant(String variant) const {
     return active_variants.has(variant) ? active_variants[variant] : "[default]";
 }
 float FlashPlayer::get_symbol_frame(FlashTimeline* p_symbol, float p_default) {
-    return p_symbol == NULL || p_symbol->get_variation_idx() < 0 ? p_default : frame_overrides[p_symbol->get_variation_idx()];
+    if (p_symbol == NULL || p_symbol->get_variation_idx() < 0) {
+        return p_default;
+    }
+
+    float frame = frame_overrides[p_symbol->get_variation_idx()];
+    return frame < 0 ? p_default : frame;
 }
 
 Dictionary FlashPlayer::get_variants() const {
