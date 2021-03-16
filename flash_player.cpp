@@ -312,10 +312,10 @@ void FlashPlayer::_bind_methods() {
     ADD_SIGNAL(MethodInfo("animation_event", PropertyInfo(Variant::STRING, "name")));
 
     // compatiblity
-    ClassDB::bind_method(D_METHOD("set_active_label", "active_label"), &FlashPlayer::set_active_symbol);
-    ClassDB::bind_method(D_METHOD("get_active_label"), &FlashPlayer::get_active_symbol);
-    ClassDB::bind_method(D_METHOD("set_active_timeline", "active_timeline"), &FlashPlayer::set_active_clip);
-    ClassDB::bind_method(D_METHOD("get_active_timeline"), &FlashPlayer::get_active_clip);
+    ClassDB::bind_method(D_METHOD("set_active_label", "active_label"), &FlashPlayer::set_active_clip);
+    ClassDB::bind_method(D_METHOD("get_active_label"), &FlashPlayer::get_active_clip);
+    ClassDB::bind_method(D_METHOD("set_active_timeline", "active_timeline"), &FlashPlayer::set_active_symbol);
+    ClassDB::bind_method(D_METHOD("get_active_timeline"), &FlashPlayer::get_active_symbol);
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_label", "get_active_label");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_timeline", "get_active_timeline");
 
