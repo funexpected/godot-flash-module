@@ -623,7 +623,7 @@ void FlashLayer::animation_process(FlashPlayer* node, float time, float delta, T
         FlashColorEffect effect = current->color_effect;
         FlashInstance *inst = Object::cast_to<FlashInstance>(elem.ptr());
         if (inst != NULL) {
-            effect = effect * inst->color_effect;
+            effect = inst->color_effect * effect;
         }
         FlashColorEffect next_effect = effect;
 
@@ -637,13 +637,13 @@ void FlashLayer::animation_process(FlashPlayer* node, float time, float delta, T
             FlashInstance *next_inst = Object::cast_to<FlashInstance>(next_elem.ptr());
             next_effect = next->color_effect;
             if (next_inst != NULL) {
-                next_effect = next_effect * next_inst->color_effect;
+                next_effect = next_inst->color_effect*next_effect;
             }
         }
         effect = effect.interpolate(next_effect, interpolation);
 
 
-        elem->animation_process(node, frame_time - current->get_index(), delta, parent_transform * tr, parent_effect*effect);
+        elem->animation_process(node, frame_time - current->get_index(), delta, parent_transform * tr, effect*parent_effect);
         idx++;
     }
     if (type == "mask") node->mask_end(get_eid());
