@@ -501,10 +501,10 @@ void FlashTimeline::animation_process(FlashPlayer* node, float time, float delta
     }
 
     for (List<Ref<FlashLayer>>::Element *E = masks.front(); E; E = E->next()) {
-        E->get()->animation_process(node, time, duration, tr, effect);
+        E->get()->animation_process(node, time, delta, tr, effect);
     }
     for (List<Ref<FlashLayer>>::Element *E = layers.back(); E; E = E->prev()) {
-        E->get()->animation_process(node, time, duration, tr, effect);
+        E->get()->animation_process(node, time, delta, tr, effect);
     }
 }
 
