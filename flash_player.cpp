@@ -262,6 +262,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     active_variants.clear();
     if (resource.is_valid()) {
         frame_overrides.resize(resource->get_variated_symbols_count());
+        for (int i=0; i<frame_overrides.size(); i++) { frame_overrides.set(i, -1); }
         active_symbol = resource->get_main_timeline();
         if (active_symbol.is_valid())
             playback_end = active_symbol->get_duration();
