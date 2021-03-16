@@ -211,28 +211,39 @@ Dictionary FlashDocument::get_variants() const {
     return variants;
 }
 void FlashDocument::cache_variants() {
+    Set<String> variated_symbols;
     for (int i=0; i<symbols.size(); i++) {
         Ref<FlashTimeline> timeline = symbols.get_value_at_index(i);
         String token = timeline->get_token();
-        //print_line("check instance " + );
         for (List<Ref<FlashLayer>>::Element *L = timeline->layers.front(); L; L = L->next()) {
             Ref<FlashLayer> layer = L->get();
-            //print_line("layer name: " + layer->get_name());
             for (List<Ref<FlashFrame>>::Element *F = layer->frames.front(); F; F = F->next()) {
                 Ref<FlashFrame> frame = F->get();
-
                 if (frame->label_type == "anchor") {
-                    Array variants_for_instance;
-                    if (variants.has(token)) {
-                        variants_for_instance = variants[token];
+                    Dictionary variants_by_layer;
+                    if (variants.has(layer->get_layer_name())) {
+                        variants_by_layer = variants[layer->get_layer_name()];
                     } else {
-                        variants[token] = variants_for_instance;
+                        variants[layer->get_layer_name()] = variants_by_layer;
                     }
-                    variants_for_instance.push_back(frame->frame_name);
-                    //print_line("  add variant " + frame->get_frame_name());
+                    Dictionary symbols_by_variant;
+                    if (variants_by_layer.has(frame->frame_name)) {
+                        symbols_by_variant = variants_by_layer[frame->frame_name];
+                    } else {
+                        variants_by_layer[frame->frame_name] = symbols_by_variant;
+                    }
+                    symbols_by_variant[token] = frame->index;
+                    variated_symbols.insert(token);
                 }
             }
         }
+    }
+    variated_symbols_count = variated_symbols.size();
+    int variant_idx = 0;
+    for (Set<String>::Element *E = variated_symbols.front(); E != NULL; E = E->next()) {
+        Ref<FlashTimeline> symbol = get_symbols()[E->get()];
+        symbol->set_variation_idx(variant_idx);
+        variant_idx++; 
     }
 }
 Ref<FlashDocument> FlashDocument::from_file(const String &p_path) {
@@ -944,7 +955,7 @@ void FlashInstance::animation_process(FlashPlayer* node, float time, float delta
         loop == "play once"     ? MIN(first_frame + time, tl->get_duration()-0.001) :
                                   first_frame + time;
 
-    instance_time = node->get_symbol_frame(timeline_token, instance_time);
+    instance_time = node->get_symbol_frame(tl, instance_time);
 
     tl->animation_process(node, instance_time, delta, tr, effect);
 

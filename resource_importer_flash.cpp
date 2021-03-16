@@ -34,7 +34,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 11;
+const int ResourceImporterFlash::importer_version = 12;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";

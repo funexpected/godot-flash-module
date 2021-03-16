@@ -106,26 +106,46 @@ void FlashPlayer::_notification(int p_what) {
 };
 void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
     //ERR_FAIL_COND_MSG(resource.is_null(), "Can't override symbol without resource");
-    if (p_value.get_type() == Variant::NIL && frame_overrides.has(p_symbol)) {
-        frame_overrides.erase(p_symbol);
+    if (resource.is_null()) return;
+    Ref<FlashTimeline> symbol = resource->get_symbols().get(p_symbol, Ref<FlashTimeline>());
+    if (symbol.is_null()) return;
+    if (symbol->get_variation_idx() < 0) return;
+    if (p_value.get_type() == Variant::NIL) {
+        frame_overrides.set(symbol->get_variation_idx(), -1);
         animation_process();
     } else if (p_value.get_type() == Variant::REAL || p_value.get_type() == Variant::INT) {
-        frame_overrides[p_symbol] = p_value;
+        frame_overrides.set(symbol->get_variation_idx(), p_value);
         animation_process();
     }
 }
 void FlashPlayer::set_variant(String variant, Variant value) {
     if (value == Variant() || value == "[default]") {
         if(active_variants.has(variant)) active_variants.erase(variant);
-        if (frame_overrides.has(variant)) frame_overrides.erase(variant);
     } else {
         active_variants[variant] = value;
-        if (!resource.is_valid()) return;
-        Ref<FlashTimeline> symbol = resource->get_symbols().get(variant, Variant());
-        if (symbol.is_valid()) {
-            Dictionary variants = symbol->get_variants();
-            variant = variant.replace("    ", "/");
-            frame_overrides[variant] = variants.get(value, 0);
+    }
+
+    if (!resource.is_valid()) return;
+    Dictionary variants = resource->get_variants();
+    if (variants.has(variant)) {
+        Dictionary symbols_by_variant = variants[variant];
+        if (symbols_by_variant.has(value)) {
+            if (value == "[default]") {
+                for (int i=0; i<symbols_by_variant.size(); i++) {
+                    Ref<FlashTimeline> symbol = resource->get_symbols().get(symbols_by_variant.get_key_at_index(i), Variant());
+                    if (symbol.is_null() || symbol->get_variation_idx() < 0) continue;
+                    frame_overrides.set(symbol->get_variation_idx(), -1);
+                }
+            } else {
+                Dictionary frames_by_symbol = symbols_by_variant[value];
+                for (int i=0; i<frames_by_symbol.size(); i++) {
+                    String token = frames_by_symbol.get_key_at_index(i);
+                    Ref<FlashTimeline> symbol = resource->get_symbols().get(token, Variant());
+                    if (symbol.is_null() || symbol->get_variation_idx() < 0) continue;
+                    int frame = frames_by_symbol.get_value_at_index(i);
+                    frame_overrides.set(symbol->get_variation_idx(), frame);
+                }
+            }
         }
     }
     animation_process();
@@ -133,8 +153,8 @@ void FlashPlayer::set_variant(String variant, Variant value) {
 String FlashPlayer::get_variant(String variant) const {
     return active_variants.has(variant) ? active_variants[variant] : "[default]";
 }
-float FlashPlayer::get_symbol_frame(String p_symbol, float p_default) {
-    return frame_overrides.has(p_symbol) ? frame_overrides[p_symbol] : p_default;
+float FlashPlayer::get_symbol_frame(FlashTimeline* p_symbol, float p_default) {
+    return p_symbol == NULL || p_symbol->get_variation_idx() < 0 ? p_default : frame_overrides[p_symbol->get_variation_idx()];
 }
 
 Dictionary FlashPlayer::get_variants() const {
@@ -173,11 +193,10 @@ void FlashPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
     Dictionary variants = resource->get_variants();
     for (int i=0; i<variants.size(); i++) {
         String key = variants.get_key_at_index(i);
-        key = key.replace("/", "    ");
-        Array options = variants[key];
+        Dictionary options = variants[key];
         String options_string = "[default]";
         for (int j=0; j<options.size(); j++) {
-            String option = options[j];
+            String option = options.get_key_at_index(j);
             options_string += "," + option;
         }
         p_list->push_back(PropertyInfo(Variant::STRING, "variants/" + key, PROPERTY_HINT_ENUM, options_string));
@@ -242,11 +261,14 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     frame_overrides.clear();
     active_variants.clear();
     if (resource.is_valid()) {
+        frame_overrides.resize(resource->get_variated_symbols_count());
         active_symbol = resource->get_main_timeline();
         if (active_symbol.is_valid())
             playback_end = active_symbol->get_duration();
         VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
         VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
+    } else {
+        frame_overrides.resize(0);
     }
     animation_process();
     _change_notify();

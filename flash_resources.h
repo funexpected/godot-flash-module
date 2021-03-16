@@ -136,6 +136,7 @@ class FlashDocument: public FlashElement {
     int last_eid;
     Ref<TextureArray> atlas;
     Dictionary variants;
+    int variated_symbols_count;
 
     static String invalid_character;
 
@@ -166,6 +167,7 @@ public:
     float get_duration(String timeline = String(), String label = String());
     Dictionary get_variants() const;
     void cache_variants();
+    int get_variated_symbols_count() const { return variated_symbols_count; }
 
     FlashTimeline* get_timeline(String token);
     void parse_timeline(const String &path);
@@ -213,12 +215,14 @@ class FlashTimeline: public FlashElement {
     Dictionary variants;
     List<Ref<FlashLayer>> layers;
     List<Ref<FlashLayer>> masks;
+    int variation_idx;
 
 public:
     FlashTimeline():
 
         token(""),
-        duration(0){}
+        duration(0),
+        variation_idx(-1){}
 
     static void _bind_methods();
 
@@ -236,6 +240,8 @@ public:
     void set_events(Dictionary p_events) { events = p_events; }
     Array get_layers();
     void set_layers(Array p_layers);
+    int get_variation_idx() const { return variation_idx; }
+    void set_variation_idx(int p_variation_idx) { variation_idx = p_variation_idx; }
 
     Ref<FlashLayer> get_layer(int idx);
     void add_label(const String &name, const String &label_type, float start, float duration);

@@ -69,7 +69,7 @@ class FlashPlayer: public Node2D {
     Ref<ImageTexture> clipping_texture;
     HashMap<int, List<FlashMaskItem>> masks;
     List<int> mask_stack;
-    HashMap<String, int> frame_overrides;
+    Vector<int> frame_overrides;
     HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
@@ -98,7 +98,7 @@ public:
     void set_variant(String key, Variant value);
     String get_variant(String key) const;
     Dictionary get_variants() const;
-    float get_symbol_frame(String p_symbol, float p_default);
+    float get_symbol_frame(FlashTimeline* symbol, float p_default);
     float get_frame_rate() const { return frame_rate; }
     void set_frame_rate(float p_frame_rate) { frame_rate = p_frame_rate; }
     bool is_playing() const { return playing; }
