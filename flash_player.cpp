@@ -53,16 +53,18 @@ void FlashPlayer::_notification(int p_what) {
 
         case NOTIFICATION_PROCESS: {
             performance_triangles_generated = 0;
-            if (playing) {
+            if (playing && active_symbol.is_valid()) {
                 bool animation_completed = false;
                 float delta = get_process_delta_time()*frame_rate;
                 frame += delta;
                 if (!loop && frame > playback_end) {
                     animation_completed = true;
                     frame = playback_end - 0.0001;
-                } else while (frame > playback_end) {
-                    animation_completed = true;
-                    frame -= playback_end - playback_start;
+                } else {
+                    while (frame > playback_end) {
+                        animation_completed = true;
+                        frame -= playback_end - playback_start;
+                    }
                 }
                 animation_process(delta);
                 if (animation_completed) {
