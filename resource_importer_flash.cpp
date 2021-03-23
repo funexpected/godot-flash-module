@@ -64,6 +64,7 @@ int ResourceImporterFlash::get_importer_version() const {
 void ResourceImporterFlash::get_import_options(List<ImportOption> *r_options, int p_preset) const {
 
     r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "process/downscale", PROPERTY_HINT_ENUM, "Disabled,x2,x4"), 1));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "process/fix_alpha_border"), true));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "compress/mode", PROPERTY_HINT_ENUM, "Lossless (PNG),Video RAM (S3TC/ETC/BPTC),Uncompressed", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), 1));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "flags/repeat", PROPERTY_HINT_ENUM, "Disabled,Enabled,Mirrored"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "flags/filter"), true));
@@ -121,6 +122,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 	bool mipmaps = p_options["flags/mipmaps"];
 	int srgb = p_options["flags/srgb"];
     int downscale = p_options["process/downscale"];
+    bool fix_alpha_border = p_options["process/fix_alpha_border"];
 
     int tex_flags = 0;
 	if (repeat > 0)
@@ -258,10 +260,14 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         if (img->get_format() != Image::FORMAT_RGBA8) {
             img->convert(Image::FORMAT_RGBA8);
         }
-        img->fix_alpha_edges();
+        if (fix_alpha_border) {
+            img->fix_alpha_edges();
+        }
         for (int j=0; j<downscale; j++) {
             img->shrink_x2();
-            img->fix_alpha_edges();
+            if (fix_alpha_border) {
+                img->fix_alpha_edges();
+            }
         }
         //img->optimize_channels();
         spritesheet_images.push_back(img);
