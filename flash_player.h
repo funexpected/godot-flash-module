@@ -47,6 +47,9 @@ class FlashPlayer: public Node2D {
     bool playing;
     float playback_start;
     float playback_end;
+    bool tracks_dirty;
+    float queued_delta;
+    bool animation_process_queued;
     Ref<FlashDocument> resource;
     String active_symbol_name;
     Ref<FlashTimeline> active_symbol;
@@ -65,6 +68,8 @@ class FlashPlayer: public Node2D {
     Vector<int> indices;
     List<String> events;
 
+    HashMap<String, Vector3> clips_state;
+    HashMap<String, String> active_clips;
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
     HashMap<int, List<FlashMaskItem>> masks;
@@ -97,6 +102,11 @@ public:
     void override_frame(String p_symbol, Variant p_frame);
     void set_variant(String key, Variant value);
     String get_variant(String key) const;
+    void set_clip(String header, Variant value);
+    String get_clip(String header) const;
+    PoolStringArray get_clips_tracks() const;
+    PoolStringArray get_clips_for_track(const String &track) const;
+    float get_clip_duration(const String &track, const String &clip) const;
     Dictionary get_variants() const;
     float get_symbol_frame(FlashTimeline* symbol, float p_default);
     float get_frame_rate() const { return frame_rate; }
@@ -112,9 +122,15 @@ public:
     void set_active_symbol(String p_symbol);
     String get_active_clip() const;
     void set_active_clip(String p_clip);
+    PoolStringArray get_symbols() const;
+    PoolStringArray get_clips(String p_symbol=String()) const;
 
     // batcher part
-    void animation_process(float delta=0);
+    void queue_animation_process();
+    void queue_process(float delta=0.0);
+    void _animation_process();
+    void advance(float p_delta, bool p_skip=false, bool advance_all_tracks=false);
+    void advance_clip_for_track(const String &p_track, const String &p_clip, float delta=0.0, bool p_skip=false, float *r_elapsed=NULL, float *r_ramaining=NULL);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
     void queue_animation_event(const String &p_name, bool p_reversed=false);

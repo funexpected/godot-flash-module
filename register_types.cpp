@@ -28,6 +28,7 @@
 #include "register_types.h"
 #include "flash_player.h"
 #include "flash_resources.h"
+#include "animation_node_flash.h"
 
 #ifdef TOOLS_ENABLED
 #include "core/engine.h"
@@ -242,8 +243,12 @@ Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
 
 void register_flash_types() {
 
-	ClassDB::register_virtual_class<FlashElement>();
 	ClassDB::register_class<FlashPlayer>();
+	ClassDB::register_virtual_class<AnimationStateBaseNode>();
+	ClassDB::register_class<AnimationNodeFlashSymbol>();
+	ClassDB::register_class<AnimationNodeFlashClip>();
+	ClassDB::register_class<AnimationNodeStateUpdate>();
+	ClassDB::register_virtual_class<FlashElement>();
 	ClassDB::register_class<FlashTextureRect>();
 	ClassDB::register_class<FlashDocument>();
 	ClassDB::register_class<FlashBitmapItem>();

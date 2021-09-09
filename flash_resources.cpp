@@ -373,6 +373,8 @@ void FlashTimeline::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_token", "token"), &FlashTimeline::set_token);
     ClassDB::bind_method(D_METHOD("get_local_path"), &FlashTimeline::get_local_path);
     ClassDB::bind_method(D_METHOD("set_local_path", "local_path"), &FlashTimeline::set_local_path);
+    ClassDB::bind_method(D_METHOD("get_clips_header"), &FlashTimeline::get_clips_header);
+    ClassDB::bind_method(D_METHOD("set_clips_header", "clips_header"), &FlashTimeline::set_clips_header);
     ClassDB::bind_method(D_METHOD("get_duration"), &FlashTimeline::get_duration);
     ClassDB::bind_method(D_METHOD("set_duration", "duration"), &FlashTimeline::set_duration);
 
@@ -382,6 +384,7 @@ void FlashTimeline::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "events", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_events", "get_events");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "token", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_token", "get_token");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "local_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_local_path", "get_local_path");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "clips_header", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_clips_header", "get_clips_header");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "duration", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL ), "set_duration", "get_duration");
 }
 Array FlashTimeline::get_layers() {
@@ -786,8 +789,12 @@ Error FlashFrame::parse(Ref<XMLParser> xml) {
     }
     if (frame_name != "") {
         FlashTimeline *tl = find_parent<FlashTimeline>();
+        FlashLayer *layer = find_parent<FlashLayer>();
         if (tl != NULL) {
             tl->add_label(frame_name, label_type, index, duration);
+            if (layer != NULL) {
+                tl->set_clips_header(layer->get_layer_name());
+            }
         }
     }
     return Error::OK;

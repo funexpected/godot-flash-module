@@ -54,28 +54,7 @@ void FlashPlayer::_notification(int p_what) {
         case NOTIFICATION_PROCESS: {
             performance_triangles_generated = 0;
             if (playing && active_symbol.is_valid()) {
-                bool animation_completed = false;
-                float delta = get_process_delta_time()*frame_rate;
-                frame += delta;
-                if (!loop && frame > playback_end) {
-                    animation_completed = true;
-                    frame = playback_end - 0.0001;
-                } else {
-                    while (frame > playback_end) {
-                        animation_completed = true;
-                        frame -= playback_end - playback_start;
-                    }
-                }
-                animation_process(delta);
-                if (animation_completed) {
-#ifndef TOOLS_ENABLED
-                    call_deferred("emit_signal", "animation_completed");
-#else
-                    if (!Engine::get_singleton()->is_editor_hint())
-                        call_deferred("emit_signal", "animation_completed");
-#endif
-
-                }
+                advance(get_process_delta_time(), false, true);
             }
         } break;
 
@@ -114,10 +93,10 @@ void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
     if (symbol->get_variation_idx() < 0) return;
     if (p_value.get_type() == Variant::NIL) {
         frame_overrides.set(symbol->get_variation_idx(), -1);
-        animation_process();
+        queue_process();
     } else if (p_value.get_type() == Variant::REAL || p_value.get_type() == Variant::INT) {
         frame_overrides.set(symbol->get_variation_idx(), p_value);
-        animation_process();
+        queue_process();
     }
 }
 void FlashPlayer::set_variant(String variant, Variant value) {
@@ -150,13 +129,48 @@ void FlashPlayer::set_variant(String variant, Variant value) {
             }
         }
     }
-    animation_process();
+    queue_process();
 }
 String FlashPlayer::get_variant(String variant) const {
     return active_variants.has(variant) ? active_variants[variant] : "[default]";
 }
+
+void FlashPlayer::set_clip(String clip, Variant value) {
+    if (value == Variant() || value == "[default]") {
+        if(clips_state.has(clip)) clips_state.erase(clip);
+        if(active_clips.has(clip)) active_clips.erase(clip);
+    } else {
+        String *track_clip = active_clips.getptr(clip);
+        if (track_clip == NULL || *track_clip == value) return;
+        active_clips[clip] = value;
+        Array timelines = resource->get_symbols().values();
+        for (int i=0; i<timelines.size(); i++) {
+            Ref<FlashTimeline> tl = timelines[i];
+            if (clip != tl->get_clips_header()) continue;
+            Vector2 clip_data = tl->get_clips()[value];
+            clips_state[clip] = Vector3(clip_data.x, clip_data.y, 0.0);
+            break;
+        }
+    }
+    tracks_dirty = true;
+    queue_process();
+}
+
+String FlashPlayer::get_clip(String clip) const {
+    return active_clips.has(clip) ? active_clips[clip] : "[default]";
+}
+
 float FlashPlayer::get_symbol_frame(FlashTimeline* p_symbol, float p_default) {
-    if (p_symbol == NULL || p_symbol->get_variation_idx() < 0) {
+    if (p_symbol == NULL) {
+        return p_default;
+    }
+
+    Vector3 *clip = clips_state.getptr(p_symbol->get_clips_header());
+    if (clip != NULL) {
+        return clip->x + clip->z;        
+    }
+
+    if (p_symbol->get_variation_idx() < 0) {
         return p_default;
     }
 
@@ -176,6 +190,11 @@ bool FlashPlayer::_set(const StringName &p_name, const Variant &p_value) {
         set_variant(variant, p_value);
         return true;
     }
+    if (n.begins_with("clips/")) {
+        String clip = n.substr(strlen("clips/"));
+        set_clip(clip, p_value);
+        return true;
+    }
     return false;
 }
 
@@ -184,6 +203,10 @@ bool FlashPlayer::_get(const StringName &p_name, Variant &r_ret) const {
     if (n.begins_with("variants/")) {
         String variant = n.substr(strlen("variants/"));
         r_ret = get_variant(variant);
+        return true;
+    } else if (n.begins_with("clips/")) {
+        String clip = n.substr(strlen("clips/"));
+        r_ret = get_clip(clip);
         return true;
     } else if (p_name == "performance/triangles_drawn") {
 		r_ret = performance_triangles_drawn;
@@ -208,6 +231,70 @@ void FlashPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
         }
         p_list->push_back(PropertyInfo(Variant::STRING, "variants/" + key, PROPERTY_HINT_ENUM, options_string));
     }
+    HashMap<String, Vector<String>> clips;
+    Array timelines = resource->get_symbols().values();
+    for (int i=0; i<timelines.size(); i++) {
+        Ref<FlashTimeline> tl = timelines[i];
+        String clips_header = tl->get_clips_header();
+        if (clips_header == String()) continue;
+        Array clip_names = tl->get_clips().keys();
+        for (int i=0; i<clip_names.size(); i++) {
+            String clip_name = clip_names[i];
+            if (clips[clips_header].find(clip_name) < 0) {
+                clips[clips_header].push_back(clip_name);
+            }
+        }
+    }
+    List<String> clip_keys;
+    clips.get_key_list(&clip_keys);
+    for (List<String>::Element *E = clip_keys.front(); E; E = E->next()) {
+        String clips_key = E->get();
+        Vector<String> timeline_clips = clips[clips_key];
+        timeline_clips.insert(0, "[default]");
+        p_list->push_back(PropertyInfo(Variant::STRING, "clips/" + clips_key, PROPERTY_HINT_ENUM, String(",").join(timeline_clips)));
+    }
+}
+
+PoolStringArray FlashPlayer::get_clips_tracks() const {
+    PoolStringArray result;
+    Dictionary unique;
+    if (!resource.is_valid()) return result;
+    Array timelines = resource->get_symbols().values();
+    for (int i=0; i<timelines.size(); i++) {
+        Ref<FlashTimeline> tl = timelines[i];
+        String clips_track = tl->get_clips_header();
+        if (clips_track == String()) continue;
+        if (!unique.has(clips_track)) {
+            unique[clips_track] = true;
+            result.push_back(clips_track);
+        }
+    }
+    return result;
+}
+
+PoolStringArray FlashPlayer::get_clips_for_track(const String &track) const {
+    PoolStringArray result;
+    Dictionary cache;
+    if (!resource.is_valid()) return result;
+    Array timelines = resource->get_symbols().values();
+    for (int i=0; i<timelines.size(); i++) {
+        Ref<FlashTimeline> tl = timelines[i];
+        String clips_track = tl->get_clips_header();
+        if (clips_track != track) continue;
+        Array clip_names = tl->get_clips().keys();
+        for (int i=0; i<clip_names.size(); i++) {
+            String clip_name = clip_names[i];
+            if (!cache.has(clip_name)) {
+                cache[clip_name] = true;
+                result.push_back(clip_name);
+            }
+        }
+    }
+    return result;
+}
+
+float FlashPlayer::get_clip_duration(const String &header, const String &clip) const {
+    return 0.0;
 }
 
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
@@ -278,7 +365,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     } else {
         frame_overrides.resize(0);
     }
-    animation_process();
+    queue_process();
     _change_notify();
 }
 
@@ -306,6 +393,8 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_active_symbol"), &FlashPlayer::get_active_symbol);
     ClassDB::bind_method(D_METHOD("set_active_clip", "active_clip"), &FlashPlayer::set_active_clip);
     ClassDB::bind_method(D_METHOD("get_active_clip"), &FlashPlayer::get_active_clip);
+
+    ClassDB::bind_method(D_METHOD("_animation_process"), &FlashPlayer::_animation_process);
 
     ClassDB::bind_method(D_METHOD("_sort_clips"), &FlashPlayer::_sort_clips);
 
@@ -336,6 +425,7 @@ float FlashPlayer::get_duration(String p_symbol, String p_clip) {
 
 void FlashPlayer::set_active_symbol(String p_value) {
     if (p_value == "[document]") p_value = "";
+    if (active_symbol_name == p_value) return;
     active_symbol_name = p_value;
     active_clip = "";
     frame = 0;
@@ -354,7 +444,7 @@ void FlashPlayer::set_active_symbol(String p_value) {
     } else {
         playback_end = 0;
     }
-    animation_process();
+    queue_process();
     _change_notify();
 }
 String FlashPlayer::get_active_symbol() const {
@@ -363,6 +453,7 @@ String FlashPlayer::get_active_symbol() const {
 
 void FlashPlayer::set_active_clip(String p_value) {
     if (p_value == "[full]") p_value = "";
+    if (active_clip == p_value) return;
     active_clip = p_value;
     if (active_symbol.is_valid()) {
         Dictionary clips = active_symbol->get_clips();
@@ -379,7 +470,7 @@ void FlashPlayer::set_active_clip(String p_value) {
     } else {
         active_clip = "";
     }
-    animation_process();
+    queue_process();
     update();
 }
 
@@ -387,9 +478,59 @@ String FlashPlayer::get_active_clip() const {
     return active_clip == String() ? "[full]" : active_clip;
 }
 
-void FlashPlayer::animation_process(float delta) {
-    if (processed_frame == frame)
+PoolStringArray FlashPlayer::get_symbols() const {
+    PoolStringArray result;
+    if (!resource.is_valid()) {
+        return result;
+    }
+    Array symbols = resource->get_symbols().values();
+    for (int i=0; i<symbols.size(); i++){
+        Ref<FlashTimeline> symbol = symbols[i];
+        if (symbol->get_local_path().find("/") >= 0) continue;
+        result.push_back(symbol->get_token());
+    }
+    return result;
+}
+
+PoolStringArray FlashPlayer::get_clips(String p_symbol) const {
+    PoolStringArray result;
+    Ref<FlashTimeline> symbol;
+    if (p_symbol == String()) {
+        symbol = active_symbol;
+    } else {
+        Array symbols = resource->get_symbols().values();
+        for (int i=0; i<symbols.size(); i++){
+            Ref<FlashTimeline> s = symbols[i];
+            if (s->get_local_path().find("/") >= 0) continue;
+            if (s->get_token() == p_symbol) {
+                symbol = s;
+                break;
+            }
+        }
+    }
+    if (!symbol.is_valid()) return result;
+    Array clips = symbol->get_clips().keys();
+    for (int i=0; i<clips.size(); i++){
+        String clip_name = clips[i];
+        result.push_back(clip_name);
+    }
+    return result;
+}
+
+void FlashPlayer::queue_process(float p_delta) {
+    queued_delta = MAX(p_delta, queued_delta);
+    if (!animation_process_queued) {
+        animation_process_queued = true;
+        call_deferred("_animation_process");
+    }
+}
+
+void FlashPlayer::_animation_process() {
+    if (processed_frame == frame && !tracks_dirty) {
+        animation_process_queued = false;
+        queued_delta = 0.0;
         return;
+    }
     events.clear();
     masks.clear();
     clipping_cache.clear();
@@ -402,10 +543,13 @@ void FlashPlayer::animation_process(float delta) {
 
     if (!active_symbol.is_valid()) {
         update();
+        animation_process_queued = false;
+        queued_delta = 0.0;
+        tracks_dirty = false;
         return;
     }
 
-    active_symbol->animation_process(this, frame, delta);
+    active_symbol->animation_process(this, frame, queued_delta);
     update();
     performance_triangles_generated = indices.size() / 3;
 
@@ -419,6 +563,119 @@ void FlashPlayer::animation_process(float delta) {
             call_deferred("emit_signal", "animation_event", E->get());
 #endif
     }
+    animation_process_queued = false;
+    queued_delta = 0.0;
+    tracks_dirty = false;
+}
+
+void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
+    if (!active_symbol.is_valid()) return;
+    bool animation_completed = false;
+    float delta = p_time*frame_rate;
+    if (p_seek) {
+        frame = delta;
+    } else {
+        frame += delta;
+    }
+
+    
+    if (advance_all_frames) {
+        List<String> clip_keys;
+        clips_state.get_key_list(&clip_keys);
+        for (List<String>::Element *E = clip_keys.front(); E; E = E->next()) {
+            String clips_key = E->get();
+            Vector3 *clip = clips_state.getptr(clips_key);
+            if (clip == NULL) {
+                continue;
+            }
+            if (p_seek) {
+                clip->z = delta;
+            } else {
+                clip->z += delta;
+            }
+            float duration = clip->y - clip->x;
+            if (duration <= 0) {
+                clip->z = 0.0;
+            } else if (loop) while (clip->z > duration) {
+                clip->z -= duration;
+            }
+        }
+    }
+
+    if (p_seek) {
+        delta = 0.0;
+    }
+
+    float duration = playback_end - playback_start;
+    if (!loop && frame > playback_end) {
+        animation_completed = true;
+        frame = playback_end - 0.0001;
+    } else if (loop && duration >= 0) while (frame > playback_end) {
+        animation_completed = true;
+        frame -= playback_end - playback_start;
+    }
+    queue_process(delta);
+    if (animation_completed) {
+#ifndef TOOLS_ENABLED
+        call_deferred("emit_signal", "animation_completed");
+#else
+        if (!Engine::get_singleton()->is_editor_hint())
+            call_deferred("emit_signal", "animation_completed");
+#endif
+
+    }
+}
+
+void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_clip, float p_time, bool p_seek, float *r_elapsed, float *r_remaining) {
+    if (p_clip == Variant() || p_clip == "[default]") {
+        if(clips_state.has(p_track)) clips_state.erase(p_track);
+        if(active_clips.has(p_track)) active_clips.erase(p_track);
+        if (r_elapsed != NULL) *r_elapsed = 0.0;
+        if (r_remaining != NULL) *r_remaining = 0.0;
+        return;
+    }
+
+    float delta = p_time*frame_rate;
+    String *current_clip = active_clips.getptr(p_track);
+    if (current_clip == NULL || *current_clip != p_clip) {
+        active_clips[p_track] = p_clip;
+        Array timelines = resource->get_symbols().values();
+        for (int i=0; i<timelines.size(); i++) {
+            Ref<FlashTimeline> tl = timelines[i];
+            if (p_track != tl->get_clips_header()) continue;
+            Vector2 clip_data = tl->get_clips()[p_clip];
+            clips_state[p_track] = Vector3(clip_data.x, clip_data.y, 0.0);
+            break;
+        }
+    }
+
+    Vector3 *current_state = clips_state.getptr(p_track);
+    if (current_state == NULL) {
+        if (r_elapsed != NULL) *r_elapsed = 0.0;
+        if (r_remaining != NULL) *r_remaining = 0.0;
+        return;
+    }
+    float duration = current_state->y - current_state->x;
+    if (p_seek) {
+        if (current_state->z != delta) {
+            tracks_dirty = true;
+            current_state->z = delta;
+        }
+    } else {
+        float next_state = MIN(duration, current_state->z + delta);
+        if (duration <= 0.0) {
+            next_state = 0.0;
+        } else if (loop) while (next_state > duration) {
+            next_state -= duration;
+        }
+        if (next_state != current_state->z) {
+            tracks_dirty = true;
+            current_state->z = next_state;
+        }
+    }
+    queue_process();
+    if (r_elapsed != NULL) *r_elapsed = MIN(duration, current_state->z) / frame_rate;
+    if (r_remaining != NULL) *r_remaining = (duration - current_state->z) / frame_rate;
 }
 
 void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx) {
@@ -536,12 +793,14 @@ FlashPlayer::~FlashPlayer() {
 FlashPlayer::FlashPlayer() {
     frame = 0;
     frame_rate = 30;
+    queued_delta = 0.0;
     playing = false;
     playback_start = 0;
     playback_end = 0;
     active_symbol_name = "[document]";
     active_clip = "";
     loop = false;
+    tracks_dirty = true;
 
     processed_frame = -1;
     current_mask = 0;

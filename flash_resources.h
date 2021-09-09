@@ -164,6 +164,8 @@ public:
     void set_bitmaps(Dictionary p_bitmaps) { bitmaps = p_bitmaps; }
     Array get_timelines();
     void set_timelines(Array p_timelines);
+    int get_timelines_count() const { return timelines.size(); }
+    Ref<FlashTimeline> get_timeline(int idx) const { return timelines[idx]; }
     float get_duration(String timeline = String(), String label = String());
     Dictionary get_variants() const;
     void cache_variants();
@@ -209,6 +211,7 @@ class FlashTimeline: public FlashElement {
 
     String token;
     String local_path;
+    String clips_header;
     int duration;
     Dictionary clips;
     Dictionary events;
@@ -230,6 +233,8 @@ public:
     void set_token(String p_library_name) { token = p_library_name; }
     String get_local_path() const { return local_path; }
     void set_local_path(String p_local_path) { local_path = p_local_path; }
+    String get_clips_header() const { return clips_header; }
+    void set_clips_header(String p_clips_header) { clips_header = p_clips_header; }
     int get_duration() const { return duration; }
     void set_duration(int p_duration) { duration = p_duration; }
     Dictionary get_variants() const { return variants; }
