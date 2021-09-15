@@ -95,8 +95,12 @@ protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
+	void _set_default_property_value(Variant p_value);
+	static void _bind_methods();
 
 public:
+	Variant get_default_property_value() const;
+
 	void get_parameter_list(List<PropertyInfo> *r_list) const;
 
 	virtual String get_caption() const;

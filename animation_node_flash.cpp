@@ -249,19 +249,14 @@ AnimationNodeFlashClip::AnimationNodeFlashClip() {
 
 bool AnimationNodeStateUpdate::_set(const StringName &p_name, const Variant &p_value) {
     if (p_name == "state_property") {
-        state_property = p_value;
-        if (state && !(state_property == "" || state_property == "[select]")) {
-            AnimationPlayer *ap = state->player;
-            if (ap) {
-                Node *target = Object::cast_to<Node>(ap->get_node(ap->get_root()));
-                if (target) {
-                    state_value = target->get("state/" + state_property);
-                }
-            }
-        }
+        StringName value = p_value;
+        if (state_property != value) {
+            state_property = value;
+            state_value = Variant();
 
-        _change_notify("state_property");
-        property_list_changed_notify();
+            _change_notify("state_property");
+            property_list_changed_notify();
+        }
         return true;
     } else if (p_name == "state_value") {
         _change_notify("state_value");
@@ -309,6 +304,24 @@ void AnimationNodeStateUpdate::_get_property_list(List<PropertyInfo> *p_list) co
 
     if (state_property == "" || state_property == "[select]") return;
     p_list->push_back(PropertyInfo(state_value_info.type, "state_value", state_value_info.hint, state_value_info.hint_string));
+    Variant default_value = Variant();
+    if (state_value_info.type == Variant::STRING) {
+        default_value = state_value_info.hint_string.split(",")[0];
+    } else {
+        Variant::CallError ce;
+        default_value = Variant::construct(state_value_info.type, NULL, 0, ce);
+    }
+    MessageQueue::get_singleton()->push_call(get_instance_id(), "_set_default_property_value", default_value);
+}
+
+void AnimationNodeStateUpdate::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("_set_default_property_value"), &AnimationNodeStateUpdate::_set_default_property_value);
+}
+
+void AnimationNodeStateUpdate::_set_default_property_value(Variant p_value) {
+    if (state_value == Variant()) {
+        state_value = p_value;
+    }
 }
 
 void AnimationNodeStateUpdate::get_parameter_list(List<PropertyInfo> *r_list) const {
