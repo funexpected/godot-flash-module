@@ -573,7 +573,7 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
     bool animation_completed = false;
     float delta = p_time*frame_rate;
     if (p_seek) {
-        frame = delta;
+        frame = playback_start + delta;
     } else {
         frame += delta;
     }
