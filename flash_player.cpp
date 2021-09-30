@@ -136,6 +136,7 @@ String FlashPlayer::get_variant(String variant) const {
 }
 
 void FlashPlayer::set_clip(String clip, Variant value) {
+    if (!resource.is_valid()) return;
     if (value == Variant() || value == "[default]") {
         if(clips_state.has(clip)) clips_state.erase(clip);
         if(active_clips.has(clip)) active_clips.erase(clip);
@@ -494,6 +495,7 @@ PoolStringArray FlashPlayer::get_symbols() const {
 
 PoolStringArray FlashPlayer::get_clips(String p_symbol) const {
     PoolStringArray result;
+    if (!resource.is_valid()) return result;
     Ref<FlashTimeline> symbol;
     if (p_symbol == String()) {
         symbol = active_symbol;
@@ -627,6 +629,8 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
 }
 
 void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_clip, float p_time, bool p_seek, float *r_elapsed, float *r_remaining) {
+    if (!resource.is_valid()) return;
+
     if (p_clip == Variant() || p_clip == "[default]") {
         if(clips_state.has(p_track)) clips_state.erase(p_track);
         if(active_clips.has(p_track)) active_clips.erase(p_track);
@@ -801,6 +805,7 @@ FlashPlayer::FlashPlayer() {
     active_clip = "";
     loop = false;
     tracks_dirty = true;
+    animation_process_queued = false;
 
     processed_frame = -1;
     current_mask = 0;
