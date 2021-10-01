@@ -248,79 +248,113 @@ AnimationNodeFlashClip::AnimationNodeFlashClip() {
  */
 
 bool AnimationNodeStateUpdate::_set(const StringName &p_name, const Variant &p_value) {
-    if (p_name == "state_property") {
-        StringName value = p_value;
-        if (state_property != value) {
-            state_property = value;
-            state_value = Variant();
-
-            _change_notify("state_property");
-            property_list_changed_notify();
-        }
+    String name = p_name;
+    if (p_name == "action/add") {
+        state_update[p_value] = Variant();
+        property_list_changed_notify();
         return true;
-    } else if (p_name == "state_value") {
-        _change_notify("state_value");
-        state_value = p_value;
+    } else if (p_name == "action/remove") {
+        state_update.erase(p_value);
+        property_list_changed_notify();
         return true;
-    } else {
-        return false;
+    } else if (name.begins_with("update/")) {
+        state_update[name.replace_first("update/", "")] = p_value;
+        return true;
     }
+    return false;
+    
 }
 
 bool AnimationNodeStateUpdate::_get(const StringName &p_name, Variant &r_ret) const {
-    if (p_name == "state_property") {
-        r_ret = state_property;
-        return true;
-    } else if (p_name == "state_value") {
-        r_ret = state_value;
-        return true;
-    } else {
-        return false;
+    String name = p_name;
+    if (name.begins_with("update/")) {
+        String prop_name = name.replace_first("update/", "");
+        if (state_update.has(prop_name)) {
+            r_ret = state_update[prop_name];
+            return true;
+        }
     }
+    return false;
 }
 
 void AnimationNodeStateUpdate::_get_property_list(List<PropertyInfo> *p_list) const {
     Node *target = editor_get_state_root<Node>();
     if (!target) return;
 
-    Vector<String> state_prop_names;
-    List<PropertyInfo> state_props;
-    target->get_property_list(&state_props);
-    PropertyInfo state_value_info;
+    HashMap<String, PropertyInfo> state_props;
+    List<PropertyInfo> state_props_list;
+    target->get_property_list(&state_props_list);
+    Array defined_prop_names = state_update.keys();
+    Dictionary default_values;
 
-    for (List<PropertyInfo>::Element *E = state_props.front(); E; E = E->next()) {
+    for (List<PropertyInfo>::Element *E = state_props_list.front(); E; E = E->next()) {
         if (!E->get().name.begins_with("state/")) {
             continue;
         }
         String prop_name = E->get().name.substr(strlen("state/"));
-        state_prop_names.push_back(prop_name);
-        if (prop_name == state_property) {
-            state_value_info = E->get();
+        PropertyInfo prop_info = E->get();
+        state_props.set(prop_name, prop_info);
+        Variant default_value;
+        if (prop_info.type == Variant::STRING) {
+            default_value = prop_info.hint_string.split(",")[0];
+        } else {
+            Variant::CallError ce;
+            default_value = Variant::construct(prop_info.type, NULL, 0, ce);
+        }
+        default_values[prop_name] = default_value;
+    }
+
+    
+    for (int i=0; i<defined_prop_names.size(); i++) {
+        String prop_name = defined_prop_names[i];
+        if (!state_props.has(prop_name)) {
+            continue;
+        }
+        PropertyInfo prop_info = state_props[prop_name];
+        p_list->push_back(PropertyInfo(prop_info.type, String("update/") + prop_name, prop_info.hint, prop_info.hint_string));
+    }
+
+    String add_props_hint = "[select]";
+    String remove_props_hint = "[select]";
+    for (List<PropertyInfo>::Element *E = state_props_list.front(); E; E = E->next()) {
+        if (!E->get().name.begins_with("state/")) {
+            continue;
+        }
+        String prop_name = E->get().name.substr(strlen("state/"));
+        if (!state_props.has(prop_name)) {
+            continue;
+        }
+        if (defined_prop_names.has(prop_name)) {
+            remove_props_hint += "," + prop_name;
+        } else {
+            add_props_hint += "," + prop_name;
         }
     }
-
-    if (state_property == "" || state_property == "[select]") state_prop_names.insert(0, "[select]");
-    p_list->push_back(PropertyInfo(Variant::STRING, "state_property", PROPERTY_HINT_ENUM, String(",").join(state_prop_names)));
-
-    if (state_property == "" || state_property == "[select]") return;
-    p_list->push_back(PropertyInfo(state_value_info.type, "state_value", state_value_info.hint, state_value_info.hint_string));
-    Variant default_value = Variant();
-    if (state_value_info.type == Variant::STRING) {
-        default_value = state_value_info.hint_string.split(",")[0];
-    } else {
-        Variant::CallError ce;
-        default_value = Variant::construct(state_value_info.type, NULL, 0, ce);
+    if (add_props_hint != "[select]") {
+        p_list->push_back(PropertyInfo(Variant::STRING, "action/add", PROPERTY_HINT_ENUM, add_props_hint));
     }
-    MessageQueue::get_singleton()->push_call(get_instance_id(), "_set_default_property_value", default_value);
+    if (remove_props_hint != "[select]") {
+        p_list->push_back(PropertyInfo(Variant::STRING, "action/remove", PROPERTY_HINT_ENUM, remove_props_hint));
+    }
+
+    MessageQueue::get_singleton()->push_call(get_instance_id(), "_set_default_property_values", default_values);
 }
 
 void AnimationNodeStateUpdate::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("_set_default_property_value"), &AnimationNodeStateUpdate::_set_default_property_value);
+    ClassDB::bind_method(D_METHOD("_set_default_property_values"), &AnimationNodeStateUpdate::_set_default_property_values);
 }
 
-void AnimationNodeStateUpdate::_set_default_property_value(Variant p_value) {
-    if (state_value == Variant()) {
-        state_value = p_value;
+void AnimationNodeStateUpdate::_set_default_property_values(Dictionary default_values) {
+    Array defined_values = state_update.keys();
+    for (int i=0; i<defined_values.size(); i++) {
+        String prop_name = defined_values[i];
+        if (!default_values.has(prop_name)) {
+            continue;
+        }
+        Variant value = state_update[prop_name];
+        if (value == Variant()) {
+            state_update[prop_name] = default_values[prop_name];
+        }
     }
 }
 
@@ -337,8 +371,9 @@ float AnimationNodeStateUpdate::process(float p_time, bool p_seek) {
 	ERR_FAIL_COND_V(!ap, 0);
     Node *target = Object::cast_to<Node>(ap->get_node(ap->get_root()));
     ERR_FAIL_COND_V(!target, 0);
-
-    target->set(String("state/") + state_property, state_value);
+    for (int i=0; i<state_update.size(); i++) {
+        target->set(String("state/") + state_update.get_key_at_index(i), state_update.get_value_at_index(i));
+    }
 
     return 0.0;
 }

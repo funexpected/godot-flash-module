@@ -88,14 +88,13 @@ class AnimationNodeStateUpdate: public AnimationStateBaseNode {
     GDCLASS(AnimationNodeStateUpdate, AnimationStateBaseNode);
 
 	StringName time;
-	StringName state_property;
-	Variant state_value;
+	Dictionary state_update;
 
 protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
-	void _set_default_property_value(Variant p_value);
+	void _set_default_property_values(Dictionary values);
 	static void _bind_methods();
 
 public:
