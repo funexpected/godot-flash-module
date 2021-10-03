@@ -368,6 +368,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     }
     queue_process();
     _change_notify();
+    emit_signal("resource_changed");
 }
 
 Ref<FlashDocument> FlashPlayer::get_resource() const {
@@ -406,6 +407,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_symbol", PROPERTY_HINT_ENUM, ""), "set_active_symbol", "get_active_symbol");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
 
+    ADD_SIGNAL(MethodInfo("resource_changed"));
     ADD_SIGNAL(MethodInfo("animation_completed"));
     ADD_SIGNAL(MethodInfo("animation_event", PropertyInfo(Variant::STRING, "name")));
 

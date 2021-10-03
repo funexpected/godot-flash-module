@@ -27,6 +27,20 @@
 
 #include "scene/animation/animation_tree.h"
 
+class FlashMachine: public AnimationTree {
+	GDCLASS(FlashMachine, AnimationTree);
+
+	NodePath flash_player;
+
+protected:
+	static void _bind_methods();
+
+public:
+	virtual String get_configuration_warning() const;
+	void set_flash_player(const NodePath &p_player);
+	NodePath get_flash_player() const;
+};
+
 class AnimationStateBaseNode: public AnimationRootNode {
 	GDCLASS(AnimationStateBaseNode, AnimationRootNode);
 protected:
@@ -45,6 +59,7 @@ protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;	
+	void _default_property_list(List<PropertyInfo> *p_list) const;
 
 public:
 	void get_parameter_list(List<PropertyInfo> *r_list) const;
@@ -66,6 +81,7 @@ protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
+	void _default_property_list(List<PropertyInfo> *p_list) const;
 
 	// static void _bind_methods();
 
@@ -93,6 +109,7 @@ class AnimationNodeStateUpdate: public AnimationStateBaseNode {
 protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
+	void _default_property_list(List<PropertyInfo> *p_list) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
 	void _set_default_property_values(Dictionary values);
 	static void _bind_methods();

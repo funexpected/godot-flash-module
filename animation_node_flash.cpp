@@ -28,6 +28,61 @@
 #include "editor/plugins/animation_tree_editor_plugin.h"
 #endif
 
+String FlashMachine::get_configuration_warning() const {
+    String warning = AnimationTree::get_configuration_warning();
+
+    if (!has_node(flash_player)) {
+		if (warning != String()) {
+			warning += "\n\n";
+		}
+		warning += TTR("Path to an FlashPlayer node containing flash animations is not set.");
+        return warning;
+	}
+
+    FlashPlayer* fp = Object::cast_to<FlashPlayer>(get_node(flash_player));
+    if (!fp) {
+        if (warning != String()) {
+			warning += "\n\n";
+		}
+		warning += TTR("Path set for FlashPlayer does not lead to an FlashPlayer node.");
+        return warning;
+    }
+
+    if (!fp->get_resource().is_valid()) {
+        if (warning != String()) {
+			warning += "\n\n";
+		}
+		warning += TTR("FlashPlayer node missing resource with animations.");
+        return warning;
+    }
+
+    return warning;
+}
+
+void FlashMachine::set_flash_player(const NodePath &p_player) {
+    flash_player = p_player;
+#ifdef TOOLS_ENABLED
+    update_configuration_warning();
+    FlashPlayer* fp = Object::cast_to<FlashPlayer>(get_node(flash_player));
+    if (fp) {
+        fp->connect("resource_changed", this, "update_configuration_warning");
+    }
+#endif
+}
+
+NodePath FlashMachine::get_flash_player() const {
+    return flash_player;
+}
+
+void FlashMachine::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_flash_player", "flash_player"), &FlashMachine::set_flash_player);
+	ClassDB::bind_method(D_METHOD("get_flash_player"), &FlashMachine::get_flash_player);
+
+    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "flash_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "FlashPlayer"), "set_flash_player", "get_flash_player");
+}
+
+
+
 template <class T>
 T* AnimationStateBaseNode::editor_get_state_root() const {
 #ifdef TOOLS_ENABLED
@@ -74,15 +129,35 @@ bool AnimationNodeFlashSymbol::_get(const StringName &p_name, Variant &r_ret) co
     } else if (p_name == "flash_clip") {
         r_ret = clip;
         return true;
+    } else if (p_name == "warning") {
+        r_ret = "";
+        return true;
     } else {
         return false;
     }
 }
 
+void AnimationNodeFlashSymbol::_default_property_list(List<PropertyInfo> *p_list) const {
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_symbol", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_clip", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "warning", PROPERTY_HINT_PLACEHOLDER_TEXT, "Invalid flash symbol state"));
+}
+
 void AnimationNodeFlashSymbol::_get_property_list(List<PropertyInfo> *p_list) const {
-    FlashPlayer *fp = editor_get_state_root<FlashPlayer>();
-    if (!fp) return;
+    FlashPlayer *fp;
+#ifdef TOOLS_ENABLED
+    AnimationTreeEditor *editor = AnimationTreeEditor::get_singleton();
+    if (!editor) return _default_property_list(p_list);
+
+    FlashMachine *tree = Object::cast_to<FlashMachine>(editor->get_tree());
+    if (!tree || !tree->has_node(tree->get_animation_player())) return _default_property_list(p_list);
     
+    fp = Object::cast_to<FlashPlayer>(tree->get_node(tree->get_flash_player()));
+    if (!fp) return _default_property_list(p_list);
+#else
+    return;
+#endif
+
     PoolStringArray symbols = fp->get_symbols();
     if (symbol == "" || symbol == "[select]") symbols.insert(0, "[select]");
 
@@ -106,9 +181,9 @@ String AnimationNodeFlashSymbol::get_caption() const {
 float AnimationNodeFlashSymbol::process(float p_time, bool p_seek) {
     if (symbol == "" || symbol == "[select]") return 0.0;
 
-	AnimationPlayer *ap = state->player;
-	ERR_FAIL_COND_V(!ap, 0);
-    FlashPlayer *fp = Object::cast_to<FlashPlayer>(ap->get_node(ap->get_root()));
+	FlashMachine *fm = Object::cast_to<FlashMachine>(state->tree);
+	ERR_FAIL_COND_V(!fm, 0);
+    FlashPlayer *fp = Object::cast_to<FlashPlayer>(fm->get_node(fm->get_flash_player()));
     ERR_FAIL_COND_V(!fp, 0);
 
 	float time = get_parameter(this->time);
@@ -174,14 +249,34 @@ bool AnimationNodeFlashClip::_get(const StringName &p_name, Variant &r_ret) cons
     } else if (p_name == "flash_clip") {
         r_ret = clip;
         return true;
+    } else if (p_name == "warning") {
+        r_ret = "";
+        return true;
     } else {
         return false;
     }
 }
 
+void AnimationNodeFlashClip::_default_property_list(List<PropertyInfo> *p_list) const {
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_track", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_clip", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "warning", PROPERTY_HINT_PLACEHOLDER_TEXT, "Invalid flash symbol state"));
+}
+
 void AnimationNodeFlashClip::_get_property_list(List<PropertyInfo> *p_list) const {
-    FlashPlayer *fp = editor_get_state_root<FlashPlayer>();
-    if (!fp) return;
+    FlashPlayer *fp;
+#ifdef TOOLS_ENABLED
+    AnimationTreeEditor *editor = AnimationTreeEditor::get_singleton();
+    if (!editor) return _default_property_list(p_list);
+
+    FlashMachine *tree = Object::cast_to<FlashMachine>(editor->get_tree());
+    if (!tree || !tree->has_node(tree->get_animation_player())) return _default_property_list(p_list);
+    
+    fp = Object::cast_to<FlashPlayer>(tree->get_node(tree->get_flash_player()));
+    if (!fp) return _default_property_list(p_list);
+#else
+    return;
+#endif
 
     PoolStringArray tracks = fp->get_clips_tracks();
     if (track == "" || track == "[select]") tracks.insert(0, "[select]");
@@ -212,9 +307,9 @@ String AnimationNodeFlashClip::get_caption() const {
 float AnimationNodeFlashClip::process(float p_time, bool p_seek) {
     if (track == "" || track == "[select]") return 0.0;
 
-	AnimationPlayer *ap = state->player;
-	ERR_FAIL_COND_V(!ap, 0);
-    FlashPlayer *fp = Object::cast_to<FlashPlayer>(ap->get_node(ap->get_root()));
+	FlashMachine *fm = Object::cast_to<FlashMachine>(state->tree);
+	ERR_FAIL_COND_V(!fm, 0);
+    FlashPlayer *fp = Object::cast_to<FlashPlayer>(fm->get_node(fm->get_flash_player()));
     ERR_FAIL_COND_V(!fp, 0);
 
 	float time = get_parameter(this->time);
@@ -258,6 +353,7 @@ bool AnimationNodeStateUpdate::_set(const StringName &p_name, const Variant &p_v
         property_list_changed_notify();
         return true;
     } else if (name.begins_with("update/")) {
+        // print_line(String("_set state update ") + p_name + " " + p_value));
         state_update[name.replace_first("update/", "")] = p_value;
         return true;
     }
@@ -277,9 +373,32 @@ bool AnimationNodeStateUpdate::_get(const StringName &p_name, Variant &r_ret) co
     return false;
 }
 
+void AnimationNodeStateUpdate::_default_property_list(List<PropertyInfo> *p_list) const {
+    for (int i=0; i<state_update.size(); i++) {
+        String prop_name = state_update.get_key_at_index(i);
+        Variant prop_value = state_update.get_value_at_index(i);
+        p_list->push_back(PropertyInfo(prop_value.get_type(), String("update/") + prop_name));
+    }
+}
+
+
 void AnimationNodeStateUpdate::_get_property_list(List<PropertyInfo> *p_list) const {
-    Node *target = editor_get_state_root<Node>();
-    if (!target) return;
+    Node* target;
+#ifdef TOOLS_ENABLED
+    AnimationTreeEditor *editor = AnimationTreeEditor::get_singleton();
+    if (!editor) return _default_property_list(p_list);
+
+    AnimationTree *tree = Object::cast_to<AnimationTree>(editor->get_tree());
+    if (!tree || !tree->has_node(tree->get_animation_player())) return _default_property_list(p_list);
+    
+    AnimationPlayer* ap = Object::cast_to<AnimationPlayer>(tree->get_node(tree->get_animation_player()));
+    if (!ap) return _default_property_list(p_list);
+
+    target = Object::cast_to<Node>(ap->get_node(ap->get_root()));
+    if (!target) return _default_property_list(p_list);
+#else
+    return;
+#endif
 
     HashMap<String, PropertyInfo> state_props;
     List<PropertyInfo> state_props_list;
