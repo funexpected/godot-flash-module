@@ -242,8 +242,8 @@ static void _editor_init() {
 Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
 
 void register_flash_types() {
-
 	ClassDB::register_class<FlashPlayer>();
+	ClassDB::register_class<FlashMachine>();
 	ClassDB::register_virtual_class<AnimationStateBaseNode>();
 	ClassDB::register_class<AnimationNodeFlashSymbol>();
 	ClassDB::register_class<AnimationNodeFlashClip>();
