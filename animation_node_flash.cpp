@@ -62,10 +62,12 @@ String FlashMachine::get_configuration_warning() const {
 void FlashMachine::set_flash_player(const NodePath &p_player) {
     flash_player = p_player;
 #ifdef TOOLS_ENABLED
+    property_list_changed_notify();
     update_configuration_warning();
     FlashPlayer* fp = Object::cast_to<FlashPlayer>(get_node(flash_player));
     if (fp) {
         fp->connect("resource_changed", this, "update_configuration_warning");
+        fp->connect("resource_changed", this, "property_list_changed_notify");
     }
 #endif
 }
@@ -82,24 +84,43 @@ void FlashMachine::_bind_methods() {
 }
 
 
+bool FlashMachine::_set(const StringName &p_name, const Variant &p_value) {
+    if (p_name == "track") {
+        track = p_value;
+        return true;
+    }
+    return false;
+}
 
-template <class T>
-T* AnimationStateBaseNode::editor_get_state_root() const {
-#ifdef TOOLS_ENABLED
-    AnimationTreeEditor *editor = AnimationTreeEditor::get_singleton();
-    if (!editor) return NULL;
+bool FlashMachine::_get(const StringName &p_name, Variant &r_ret) const {
+    if (p_name == "track") {
+        r_ret = track;
+        return true;
+    }
+    return false;
+}
 
-    AnimationTree *tree = editor->get_tree();
-    if (!tree || !tree->has_node(tree->get_animation_player())) return NULL;
-    
-    AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(tree->get_node(tree->get_animation_player()));
-    if (!ap) return NULL;
+void FlashMachine::_get_property_list(List<PropertyInfo> *p_list) const {
+    if (!has_node(flash_player)) return;
+    FlashPlayer* fp = Object::cast_to<FlashPlayer>(get_node(flash_player));
+    if (!fp) return;
+    Vector<String> tracks;
+    PoolStringArray existed_tracks = fp->get_clips_tracks();
+    tracks.push_back("[main]");
+    for (int i=0; i < existed_tracks.size(); i++) {
+        tracks.push_back(existed_tracks[i]);
+    }
+    p_list->push_back(PropertyInfo(Variant::STRING, "track", PROPERTY_HINT_ENUM, String(",").join(tracks)));
+}
 
-    T *root = Object::cast_to<T>(ap->get_node(ap->get_root()));
-    return root;
-#else
-    return NULL;
-#endif
+FlashMachine::FlashMachine() {
+    track = "[main]";
+}
+
+
+
+float AnimationNodeEmpty::process(float p_time, bool p_seek) {
+    return 0.0;
 }
 
 
@@ -228,14 +249,20 @@ AnimationNodeFlashSymbol::AnimationNodeFlashSymbol() {
  */
 
 bool AnimationNodeFlashClip::_set(const StringName &p_name, const Variant &p_value) {
-    if (p_name == "flash_track") {
-        track = p_value;
+    if (p_name == "clip") {
+        clip = p_value;
+        return true;
+    } else if (p_name == "flash_symbol") {
+        old_symbol = p_value;
+        return true;
+    } else if (p_name == "flash_track") {
+        old_track = p_value;
         _change_notify("flash_track");
         property_list_changed_notify();
         return true;
     } else if (p_name == "flash_clip") {
         _change_notify("flash_clip");
-        clip = p_value;
+        old_clip = p_value;
         return true;
     } else {
         return false;
@@ -243,11 +270,17 @@ bool AnimationNodeFlashClip::_set(const StringName &p_name, const Variant &p_val
 }
 
 bool AnimationNodeFlashClip::_get(const StringName &p_name, Variant &r_ret) const {
-    if (p_name == "flash_track") {
-        r_ret = track;
+    if (p_name == "clip") {
+        r_ret = clip;
+        return true;
+    } else if (p_name == "flash_symbol" ) {
+        r_ret = old_symbol;
+        return true;
+    } else if (p_name == "flash_track") {
+        r_ret = old_track;
         return true;
     } else if (p_name == "flash_clip") {
-        r_ret = clip;
+        r_ret = old_clip;
         return true;
     } else if (p_name == "warning") {
         r_ret = "";
@@ -258,6 +291,7 @@ bool AnimationNodeFlashClip::_get(const StringName &p_name, Variant &r_ret) cons
 }
 
 void AnimationNodeFlashClip::_default_property_list(List<PropertyInfo> *p_list) const {
+    p_list->push_back(PropertyInfo(Variant::STRING, "clip", PROPERTY_HINT_NONE, ""));
     p_list->push_back(PropertyInfo(Variant::STRING, "flash_track", PROPERTY_HINT_NONE, ""));
     p_list->push_back(PropertyInfo(Variant::STRING, "flash_clip", PROPERTY_HINT_NONE, ""));
     p_list->push_back(PropertyInfo(Variant::STRING, "warning", PROPERTY_HINT_PLACEHOLDER_TEXT, "Invalid flash symbol state"));
@@ -278,21 +312,38 @@ void AnimationNodeFlashClip::_get_property_list(List<PropertyInfo> *p_list) cons
     return;
 #endif
 
-    PoolStringArray tracks = fp->get_clips_tracks();
-    if (track == "" || track == "[select]") tracks.insert(0, "[select]");
-    p_list->push_back(PropertyInfo(Variant::STRING, "flash_track", PROPERTY_HINT_ENUM, tracks.join(",")));
-    if (track == "" || track == "[default]") return;
+    // legacy track/clip system
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_symbol", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_track", PROPERTY_HINT_NONE, ""));
+    p_list->push_back(PropertyInfo(Variant::STRING, "flash_clip", PROPERTY_HINT_NONE, ""));
 
-    PoolStringArray clips = fp->get_clips_for_track(track);
-    clips.insert(0, "[default]");
-    p_list->push_back(PropertyInfo(Variant::STRING, "flash_clip", PROPERTY_HINT_ENUM, clips.join(",")));
-}
-
-String AnimationNodeFlashClip::get_configuration_warning() const {
-    if (track == "" || track == "[select]") {
-        return "Track not selected";
+    StringName track = tree->get_track();
+    Vector<String> clips;
+    StringName default_value;
+    if (track == "[main]") {
+        p_list->push_back(PropertyInfo(Variant::STRING, "Track: [main]", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_CATEGORY));
+        PoolStringArray symbols = fp->get_symbols();
+        for (int i=0; i < symbols.size(); i++) {
+            String symbol = symbols[i];
+            if (i == 0) default_value = symbol;
+            PoolStringArray symbol_clips = fp->get_clips(symbol);
+            clips.push_back(symbol);
+            for (int j=0; j < symbol_clips.size(); j++) {
+                clips.push_back(symbol + "/" + symbol_clips[j]);
+            }
+        }
     } else {
-        return "";
+        p_list->push_back(PropertyInfo(Variant::STRING, String("Track: ") + track, PROPERTY_HINT_NONE, "", PROPERTY_USAGE_GROUP));
+        PoolStringArray track_clips = fp->get_clips_for_track(track);
+        for (int i=0; i< track_clips.size(); i++) {
+            if (i == 0) default_value = symbol;
+            clips.push_back(track_clips[i]);
+        }
+    }
+    p_list->push_back(PropertyInfo(Variant::STRING, "clip", PROPERTY_HINT_ENUM, String(",").join(clips)));
+
+    if (clip == StringName()) {
+        MessageQueue::get_singleton()->push_call(get_instance_id(), "set", "clip", default_value);
     }
 }
 
@@ -305,12 +356,13 @@ String AnimationNodeFlashClip::get_caption() const {
 }
 
 float AnimationNodeFlashClip::process(float p_time, bool p_seek) {
-    if (track == "" || track == "[select]") return 0.0;
+    if (clip == StringName()) return 0.0;
 
-	FlashMachine *fm = Object::cast_to<FlashMachine>(state->tree);
-	ERR_FAIL_COND_V(!fm, 0);
+    FlashMachine *fm = Object::cast_to<FlashMachine>(state->tree);
+    ERR_FAIL_COND_V(!fm, 0);
     FlashPlayer *fp = Object::cast_to<FlashPlayer>(fm->get_node(fm->get_flash_player()));
     ERR_FAIL_COND_V(!fp, 0);
+    StringName track = fm->get_track();
 
 	float time = get_parameter(this->time);
 
@@ -324,7 +376,23 @@ float AnimationNodeFlashClip::process(float p_time, bool p_seek) {
 	}
     float elapsed;
     float remaining;
-    fp->advance_clip_for_track(track, clip, step, p_seek, &elapsed, &remaining);
+    if (track == "[main]") {
+        Vector<String> clip_path = String(clip).split("/", true, 1);
+        String s = clip_path[0];
+        String c = clip_path.size() == 2 ? clip_path[1] : "";
+        float anim_size = fp->get_duration(s, c) / fp->get_frame_rate();
+        if (time > anim_size) {
+		    elapsed = anim_size;
+	    } else {
+            elapsed = time;
+        }
+        remaining = anim_size - elapsed;
+        fp->set_active_symbol(s);
+        fp->set_active_clip(c);
+        fp->advance(step, p_seek, false);
+    } else {
+        fp->advance_clip_for_track(track, clip, step, p_seek, &elapsed, &remaining);
+    }
 	set_parameter(this->time, elapsed);
 	return remaining;
 }
