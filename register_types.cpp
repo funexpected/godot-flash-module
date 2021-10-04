@@ -275,7 +275,6 @@ void register_flash_types() {
 	ClassDB::register_class<FlashPlayer>();
 	ClassDB::register_class<FlashMachine>();
 	ClassDB::register_class<AnimationNodeEmpty>();
-	ClassDB::register_class<AnimationNodeFlashSymbol>();
 	ClassDB::register_class<AnimationNodeFlashClip>();
 	ClassDB::register_class<AnimationNodeStateUpdate>();
 	ClassDB::register_virtual_class<FlashElement>();

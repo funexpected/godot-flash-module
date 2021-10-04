@@ -55,28 +55,6 @@ public:
 	virtual float process(float p_time, bool p_seek);
 };
 
-class AnimationNodeFlashSymbol: public AnimationRootNode {
-    GDCLASS(AnimationNodeFlashSymbol, AnimationRootNode);
-
-    StringName symbol;
-    StringName clip;
-	StringName time;
-
-protected:
-	bool _set(const StringName &p_name, const Variant &p_value);
-	bool _get(const StringName &p_name, Variant &r_ret) const;
-	void _get_property_list(List<PropertyInfo> *p_list) const;	
-	void _default_property_list(List<PropertyInfo> *p_list) const;
-
-public:
-	void get_parameter_list(List<PropertyInfo> *r_list) const;
-
-	virtual String get_caption() const;
-	virtual float process(float p_time, bool p_seek);
-
-	AnimationNodeFlashSymbol();
-};
-
 class AnimationNodeFlashClip: public AnimationRootNode {
     GDCLASS(AnimationNodeFlashClip, AnimationRootNode);
 
