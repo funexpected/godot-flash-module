@@ -31,25 +31,32 @@ class FlashMachine: public AnimationTree {
 	GDCLASS(FlashMachine, AnimationTree);
 
 	NodePath flash_player;
+	String track;
 
 protected:
 	static void _bind_methods();
+	bool _set(const StringName &p_name, const Variant &p_value);
+	bool _get(const StringName &p_name, Variant &r_ret) const;
+	void _get_property_list(List<PropertyInfo> *p_list) const;
+
 
 public:
 	virtual String get_configuration_warning() const;
 	void set_flash_player(const NodePath &p_player);
 	NodePath get_flash_player() const;
+	String get_track() const { return track; }
+
+	FlashMachine();
 };
 
-class AnimationStateBaseNode: public AnimationRootNode {
-	GDCLASS(AnimationStateBaseNode, AnimationRootNode);
-protected:
-	template <class T>
-	T *editor_get_state_root() const;
+class AnimationNodeEmpty: public AnimationRootNode {
+	GDCLASS(AnimationNodeEmpty, AnimationRootNode);
+public:
+	virtual float process(float p_time, bool p_seek);
 };
 
-class AnimationNodeFlashSymbol: public AnimationStateBaseNode {
-    GDCLASS(AnimationNodeFlashSymbol, AnimationStateBaseNode);
+class AnimationNodeFlashSymbol: public AnimationNodeEmpty {
+    GDCLASS(AnimationNodeFlashSymbol, AnimationNodeEmpty);
 
     StringName symbol;
     StringName clip;
@@ -70,10 +77,15 @@ public:
 	AnimationNodeFlashSymbol();
 };
 
-class AnimationNodeFlashClip: public AnimationStateBaseNode {
-    GDCLASS(AnimationNodeFlashClip, AnimationStateBaseNode);
+class AnimationNodeFlashClip: public AnimationNodeEmpty {
+    GDCLASS(AnimationNodeFlashClip, AnimationNodeEmpty);
 
-    StringName track;
+	
+	StringName old_symbol;
+	StringName old_track;
+	StringName old_clip;
+
+	StringName symbol;
     StringName clip;
 	StringName time;
 
@@ -88,7 +100,6 @@ protected:
 public:
 	void get_parameter_list(List<PropertyInfo> *r_list) const;
 
-	virtual String get_configuration_warning() const;
 	virtual String get_caption() const;
 	virtual float process(float p_time, bool p_seek);
 
@@ -100,8 +111,8 @@ public:
 	AnimationNodeFlashClip();
 };
 
-class AnimationNodeStateUpdate: public AnimationStateBaseNode {
-    GDCLASS(AnimationNodeStateUpdate, AnimationStateBaseNode);
+class AnimationNodeStateUpdate: public AnimationNodeEmpty {
+    GDCLASS(AnimationNodeStateUpdate, AnimationNodeEmpty);
 
 	StringName time;
 	Dictionary state_update;
