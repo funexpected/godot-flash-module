@@ -55,8 +55,8 @@ public:
 	virtual float process(float p_time, bool p_seek);
 };
 
-class AnimationNodeFlashSymbol: public AnimationNodeEmpty {
-    GDCLASS(AnimationNodeFlashSymbol, AnimationNodeEmpty);
+class AnimationNodeFlashSymbol: public AnimationRootNode {
+    GDCLASS(AnimationNodeFlashSymbol, AnimationRootNode);
 
     StringName symbol;
     StringName clip;
@@ -77,8 +77,8 @@ public:
 	AnimationNodeFlashSymbol();
 };
 
-class AnimationNodeFlashClip: public AnimationNodeEmpty {
-    GDCLASS(AnimationNodeFlashClip, AnimationNodeEmpty);
+class AnimationNodeFlashClip: public AnimationRootNode {
+    GDCLASS(AnimationNodeFlashClip, AnimationRootNode);
 
 	
 	StringName old_symbol;
@@ -111,8 +111,8 @@ public:
 	AnimationNodeFlashClip();
 };
 
-class AnimationNodeStateUpdate: public AnimationNodeEmpty {
-    GDCLASS(AnimationNodeStateUpdate, AnimationNodeEmpty);
+class AnimationNodeStateUpdate: public AnimationRootNode {
+    GDCLASS(AnimationNodeStateUpdate, AnimationRootNode);
 
 	StringName time;
 	Dictionary state_update;

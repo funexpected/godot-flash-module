@@ -24,6 +24,7 @@
 #include "animation_node_flash.h"
 #include "flash_player.h"
 #include "core/message_queue.h"
+#include "scene/gui/control.h"
 #ifdef TOOLS_ENABLED
 #include "editor/plugins/animation_tree_editor_plugin.h"
 #endif

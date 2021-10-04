@@ -235,6 +235,36 @@ static void _editor_init() {
 	flash_export.instance();
 	EditorExport::get_singleton()->add_export_plugin(flash_export);
 
+
+	// add custom themes for state machine nodes
+#define ADD_FRAME_STYLE(name, r, g, b)																				\
+	{																												\
+		Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();											\
+		Ref<StyleBoxFlat> default_frame = theme->get_stylebox("state_machine_frame", "GraphNode");					\
+		Ref<StyleBoxFlat> default_selected_frame = theme->get_stylebox("state_machine_selectedframe", "GraphNode");	\
+		if (default_frame.is_valid() && default_selected_frame.is_valid()) {										\
+			Ref<StyleBoxFlat> new_frame = default_frame->duplicate(true);											\
+			Ref<StyleBoxFlat> new_selected_frame = default_selected_frame->duplicate(true);							\
+			new_frame->set_bg_color(Color(r, g, b, 0.7));															\
+			new_selected_frame->set_bg_color(Color(r, g, b, 0.9));													\
+			theme->set_stylebox("state_machine_frame", String(#name), new_frame);									\
+			theme->set_stylebox("state_machine_selectedframe", String(#name), new_selected_frame);					\
+		}																											\
+	};																												\
+
+	// monokai colors from https://gist.github.com/r-malon/8fc669332215c8028697a0bbfbfbb32a
+	// grey
+	ADD_FRAME_STYLE(AnimationNodeEmpty, 46.0/255.0, 46.0/255.0, 46.0/255.0);
+	
+	// green
+	ADD_FRAME_STYLE(AnimationNodeAnimation, 180.0/255.0, 210.0/255.0, 115.0/255.0);
+	ADD_FRAME_STYLE(AnimationNodeFlashClip, 180.0/255.0, 210.0/255.0, 115.0/255.0);
+
+	// blue
+	ADD_FRAME_STYLE(AnimationNodeStateMachine, 108.0/255.0, 153.0/255.0, 187.0/255.0);
+
+	// orange
+	ADD_FRAME_STYLE(AnimationNodeStateUpdate, 229.0/255.0, 181.0/255.0, 103.0/255.0);
 }
 #endif
 
