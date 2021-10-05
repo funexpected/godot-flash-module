@@ -123,9 +123,67 @@ FlashMachine::FlashMachine() {
  *          Empty Frame
  */
 
-
 float AnimationNodeEmpty::process(float p_time, bool p_seek) {
     return 0.0;
+}
+
+/*
+ *          Delay Frame
+ */
+
+
+
+void AnimationNodeDelay::set_min_delay(float p_delay) {
+    min_delay = MAX(0, MIN(max_delay, p_delay));
+}
+
+float AnimationNodeDelay::get_min_delay() const {
+    return min_delay;
+}
+
+void AnimationNodeDelay::set_max_delay(float p_delay) {
+    max_delay = MAX(min_delay, p_delay);
+}
+
+float AnimationNodeDelay::get_max_delay() const {
+    return max_delay;
+}
+
+void AnimationNodeDelay::get_parameter_list(List<PropertyInfo> *r_list) const {
+	r_list->push_back(PropertyInfo(Variant::REAL, time, PROPERTY_HINT_NONE, "", 0));
+    r_list->push_back(PropertyInfo(Variant::REAL, delay, PROPERTY_HINT_NONE, "", 0));
+}
+
+float AnimationNodeDelay::process(float p_time, bool p_seek) {
+    float delay = get_parameter(this->delay);
+    float time = get_parameter(this->time);
+    if (p_seek) {
+		time = p_time;
+        delay = Math::random(min_delay, max_delay);
+        set_parameter(this->delay, delay);
+	} else {
+		time = MAX(0, time + p_time);
+	}
+    
+    set_parameter(this->time, time);
+    return MAX(0, delay - time);
+}
+
+void AnimationNodeDelay::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_min_delay", "p_delay"), &AnimationNodeDelay::set_min_delay);
+    ClassDB::bind_method(D_METHOD("get_min_delay"), &AnimationNodeDelay::get_min_delay);
+    ClassDB::bind_method(D_METHOD("set_max_delay", "p_delay"), &AnimationNodeDelay::set_max_delay);
+    ClassDB::bind_method(D_METHOD("get_max_delay"), &AnimationNodeDelay::get_max_delay);
+
+    ADD_PROPERTY(PropertyInfo(Variant::REAL, "min_delay", PROPERTY_HINT_EXP_RANGE, "0.0,10.0,0.1,or_greater"), "set_min_delay", "get_min_delay");
+    ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_delay", PROPERTY_HINT_EXP_RANGE, "0.0,10.0,0.1,or_greater"), "set_max_delay", "get_max_delay");
+}
+
+AnimationNodeDelay::AnimationNodeDelay() {
+    min_delay = 0.0;
+    max_delay = 1.0;
+    delay = StringName("delay");
+    time = StringName("time");
 }
 
 
@@ -210,7 +268,7 @@ void AnimationNodeFlashClip::get_parameter_list(List<PropertyInfo> *r_list) cons
 }
 
 String AnimationNodeFlashClip::get_caption() const {
-	return "FlashSwitchClip";
+	return "Flash Clip";
 }
 
 float AnimationNodeFlashClip::process(float p_time, bool p_seek) {

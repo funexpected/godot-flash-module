@@ -55,13 +55,31 @@ public:
 	virtual float process(float p_time, bool p_seek);
 };
 
+class AnimationNodeDelay: public AnimationRootNode {
+	GDCLASS(AnimationNodeDelay, AnimationRootNode);
+
+	float min_delay;
+	float max_delay;
+	StringName time;
+	StringName delay;
+
+protected:
+	static void _bind_methods();
+public:
+	void get_parameter_list(List<PropertyInfo> *r_list) const;
+	void set_min_delay(float p_delay);
+	float get_min_delay() const;
+	void set_max_delay(float p_delay);
+	float get_max_delay() const;
+	virtual float process(float p_time, bool p_seek);
+
+	AnimationNodeDelay();
+
+};
+
 class AnimationNodeFlashClip: public AnimationRootNode {
     GDCLASS(AnimationNodeFlashClip, AnimationRootNode);
 
-	
-	StringName old_symbol;
-	StringName old_track;
-	StringName old_clip;
 
 	StringName symbol;
     StringName clip;
