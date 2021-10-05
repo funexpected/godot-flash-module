@@ -253,18 +253,22 @@ static void _editor_init() {
 	};																												\
 
 	// monokai colors from https://gist.github.com/r-malon/8fc669332215c8028697a0bbfbfbb32a
-	// grey
+	// grey (empty)
 	ADD_FRAME_STYLE(AnimationNodeEmpty, 46.0/255.0, 46.0/255.0, 46.0/255.0);
 	
-	// green
+	// green (animations)
 	ADD_FRAME_STYLE(AnimationNodeAnimation, 180.0/255.0, 210.0/255.0, 115.0/255.0);
 	ADD_FRAME_STYLE(AnimationNodeFlashClip, 180.0/255.0, 210.0/255.0, 115.0/255.0);
+	ADD_FRAME_STYLE(AnimationNodeSpineAnimation, 180.0/255.0, 210.0/255.0, 115.0/255.0);
 
-	// blue
+	// blue (complex animations)
 	ADD_FRAME_STYLE(AnimationNodeStateMachine, 108.0/255.0, 153.0/255.0, 187.0/255.0);
 
-	// orange
+	// orange (instants)
 	ADD_FRAME_STYLE(AnimationNodeStateUpdate, 229.0/255.0, 181.0/255.0, 103.0/255.0);
+
+	// purple (custom non-instants)
+	ADD_FRAME_STYLE(AnimationNodeDelay, 158.0/255.0, 134.0/255.0, 200.0/255.0);
 }
 #endif
 
@@ -275,6 +279,7 @@ void register_flash_types() {
 	ClassDB::register_class<FlashPlayer>();
 	ClassDB::register_class<FlashMachine>();
 	ClassDB::register_class<AnimationNodeEmpty>();
+	ClassDB::register_class<AnimationNodeDelay>();
 	ClassDB::register_class<AnimationNodeFlashClip>();
 	ClassDB::register_class<AnimationNodeStateUpdate>();
 	ClassDB::register_virtual_class<FlashElement>();
