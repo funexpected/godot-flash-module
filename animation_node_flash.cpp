@@ -154,7 +154,7 @@ void AnimationNodeFlashClip::_get_property_list(List<PropertyInfo> *p_list) cons
     FlashMachine *tree;
 #ifdef TOOLS_ENABLED
     AnimationTreeEditor *editor = AnimationTreeEditor::get_singleton();
-    if (!editor) return _default_property_list(p_list);
+    if (!editor || !editor->is_visible()) return _default_property_list(p_list);
 
     tree = Object::cast_to<FlashMachine>(editor->get_tree());
     if (!tree || !tree->has_node(tree->get_animation_player())) return _default_property_list(p_list);
