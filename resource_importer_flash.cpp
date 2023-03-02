@@ -20,9 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
-#ifdef MODULE_FLASH_ENABLED
-
 #include <core/os/dir_access.h>
 #include <core/os/file_access.h>
 #include <core/io/compression.h>
@@ -503,6 +500,3 @@ String ResourceImporterFlash::get_import_settings_string() const {
 
 	return s;
 }
-
-
-#endif

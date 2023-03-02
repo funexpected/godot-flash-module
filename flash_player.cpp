@@ -21,9 +21,6 @@
 // SOFTWARE.
 
 
-
-#ifdef MODULE_FLASH_ENABLED
-
 #include "flash_player.h"
 
 #ifdef TOOLS_ENABLED
@@ -896,4 +893,3 @@ FlashPlayer::FlashPlayer() {
     vs->material_set_shader(flash_material, flash_shader);
     vs->canvas_item_set_material(get_canvas_item(), flash_material);
 }
-#endif

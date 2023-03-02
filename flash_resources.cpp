@@ -20,9 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
-#ifdef MODULE_FLASH_ENABLED
-
 #include "flash_resources.h"
 #include "core/io/compression.h"
 #include "core/io/marshalls.h"
@@ -1344,4 +1341,3 @@ String ResourceFormatLoaderFlashTexture::get_resource_type(const String &p_path)
 		return "TextureArray";
 	return "";
 }
-#endif

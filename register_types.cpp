@@ -21,8 +21,6 @@
 // SOFTWARE.
 
 
-#ifdef MODULE_FLASH_ENABLED
-
 #include <core/class_db.h>
 #include <core/project_settings.h>
 #include "register_types.h"
@@ -103,8 +101,10 @@ Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
 void register_flash_types() {
 	// core flash classes
 	ClassDB::register_class<FlashPlayer>();
+#ifdef MODULE_FLASH_WITH_ANIMATION_NODES
 	ClassDB::register_class<FlashMachine>();
 	ClassDB::register_class<AnimationNodeFlashClip>();
+#endif
 
 	// resources
 	ClassDB::register_virtual_class<FlashElement>();
@@ -135,10 +135,3 @@ void unregister_flash_types() {
 	ResourceLoader::remove_resource_format_loader(resource_loader_flash_texture);
 	resource_loader_flash_texture.unref();
 }
-
-#else
-
-void register_flash_types() {}
-void unregister_flash_types() {}
-
-#endif // MODULE_SPINE_ENABLED

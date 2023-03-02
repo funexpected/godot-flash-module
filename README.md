@@ -3,11 +3,11 @@ This module adds [Adobe Animate](https://www.adobe.com/products/animate.html) an
 
 ## Compilation
 Add this repo to `modules/flash` folder of Godot Engine source. See engine [compilation instructions](https://docs.godotengine.org/en/stable/development/compiling/index.html) instructions.
-`` bash
+``` bash
 cd /path/to/godot
-git submodule add git@github.com:funexpected/godot-flash-module.git modules/flash
+git submodule add https://github.com/funexpected/godot-flash-module.git modules/flash
 scons -j8
-``
+```
 
 ## Usage
 - Install [Funexpected Flash Tools](https://github.com/funexpected/flash-tools) plugin.
@@ -20,7 +20,6 @@ scons -j8
 ## Supported and planed features
 - [x] Bitmaps (full rasterization prepared by [Funexpected Flash Tools](https://github.com/funexpected/flash-tools))
 - [x] Groups (decomposed and rasterized)
-- [ ] Shapes
 - [x] Name Labels (for splitting single animation to multiply parts)
 - [x] Anchor Labels (for skinning, e.g. forcing custom frames in target symbols)
 - [x] User-defined signals (`animation_event` using comment-labels)
@@ -28,15 +27,19 @@ scons -j8
 - [x] Looping (loop, once, single frame)
 - [x] Color effects
 - [x] Tweening (for properties together)
-- [ ] Tweening (for properties separately)
 - [x] Masks (up to 4 masking elements per masked element)
-- [ ] Motion guides
 - [x] Mutltiply spritesheets packed by [Funexpected Flash Tools](https://github.com/funexpected/flash-tools)
+- [x] Downscaling spritesheets on import time
+- [x] Custom properties for importing textures (loseless/vram/uncompressed, mipmaps, filter)
+- [x] Compressing VRAM textures (reducing disk space of exported Godot project)
+
+## Unsupported features:
+
+- [ ] Shapes
+- [ ] Tweening (for properties separately)
+- [ ] Motion guides
 - [ ] Warp tool
 - [ ] Sounds
 - [ ] Custom material (for now, you can't change material for `FlashPlayer` node)
-- [ ] Blending (not in near future)
-- [ ] Filters (not in near future)
-- [x] Downscaling spritesheets on import time
-- [x] Custom properties for importing textures (loseless/vram/ uncompressed, mipmaps, filter)
-- [x] Compressing VRAM textures (reducing disk space of exported Godot project)
+- [ ] Blending
+- [ ] Filters

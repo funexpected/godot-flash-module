@@ -19,7 +19,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#ifdef MODULE_FLASH_ENABLED
 
 #include "animation_node_flash.h"
 #include "flash_player.h"
@@ -248,5 +247,3 @@ float AnimationNodeFlashClip::process(float p_time, bool p_seek) {
 AnimationNodeFlashClip::AnimationNodeFlashClip() {
 	time = "time";
 }
-
-#endif // MODULE_FLASH_ENABLED

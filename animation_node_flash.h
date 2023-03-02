@@ -21,7 +21,6 @@
 // SOFTWARE.
 
 
-#ifdef MODULE_FLASH_ENABLED
 #ifndef ANIMATION_NODE_FLASH_H
 #define ANIMATION_NODE_FLASH_H
 
@@ -82,4 +81,3 @@ public:
 
 
 #endif // ANIMATION_NODE_FLASH_H
-#endif // MODULE_FLASH_ENABLED
