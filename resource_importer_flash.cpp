@@ -149,6 +149,23 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     zipFile zip_source = unzOpen2(p_source_file.utf8().get_data(), &io);
     WARN_PRINT(itos(__LINE__));
 
+    Error err;
+	FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
+	
+    if (!f)
+    {
+        WARN_PRINT(itos(__LINE__));
+        // file not found
+	}
+     else
+    {   
+        WARN_PRINT(itos(f->get_len()));
+
+    }
+
+
+
+
     if (zip_source == NULL) return FAILED;
     WARN_PRINT(itos(__LINE__));
 
