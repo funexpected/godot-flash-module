@@ -138,28 +138,34 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 
     WARN_PRINT(String("Importing ") + p_source_file);
 
-    WARN_PRINT(itos(__LINE__));
 
     // read zip and extract it to tmp dir
     //const Vector2 PADDING(1, 1);
     FileAccess *zip_source_file;
     zlib_filefunc_def io = zipio_create_io_from_file(&zip_source_file);
-    WARN_PRINT(itos(__LINE__));
 
     zipFile zip_source = unzOpen2(p_source_file.utf8().get_data(), &io);
-    WARN_PRINT(itos(__LINE__));
+
+    WARN_PRINT(String("zip_source = ") + itos((int64_t) zip_source));
+
 
     Error err;
 	FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
 	
+	//if (!file_exists(p_source_file)) {
+    //    WARN_PRINT( "File doesn't exist.");
+    //}
+
+
     if (!f)
     {
-        WARN_PRINT(itos(__LINE__));
+        WARN_PRINT(String("File not found"));
         // file not found
 	}
      else
     {   
-        WARN_PRINT(itos(f->get_len()));
+        WARN_PRINT(String("File size: ") + itos(f->get_len()));
+        //WARN_PRINT(String("File size: ") + itos(io->get_len()));
 
     }
 
