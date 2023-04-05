@@ -138,6 +138,17 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     FileAccess *zip_source_file;
     zlib_filefunc_def io = zipio_create_io_from_file(&zip_source_file);
     zipFile zip_source = unzOpen2(p_source_file.utf8().get_data(), &io);
+
+    Error err;
+    FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
+	
+    if (!f) {
+        WARN_PRINT(String("File not found: " + p_source_file));
+	}
+     else {   
+        print_verbose(String("File size: ") + itos(f->get_len()));
+    }
+
     if (zip_source == NULL) return FAILED;
 
     DirAccess *da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
@@ -145,6 +156,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     da->make_dir_recursive(tmp_dir);
 
     if (unzGoToFirstFile(zip_source) != UNZ_OK) {
+        WARN_PRINT(String("Could not open archive: " + p_source_file));
 		return FAILED;
 	}
 
@@ -176,7 +188,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         da->remove(tmp_dir);
         return FAILED;
     }
-
 
     // parse document
     Ref<FlashDocument> doc = FlashDocument::from_file(document_path);
