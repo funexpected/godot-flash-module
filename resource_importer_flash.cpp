@@ -145,22 +145,14 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     Error err;
     FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
 	
-    if (!f)
-    {
+    if (!f) {
         WARN_PRINT(String("File not found: " + p_source_file));
-        // file not found
 	}
-     else
-    {   
+     else {   
         print_verbose(String("File size: ") + itos(f->get_len()));
     }
 
-
-
-
     if (zip_source == NULL) return FAILED;
-
-
 
     DirAccess *da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
     String tmp_dir = p_save_path + ".tmp/";
@@ -183,7 +175,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         if (unzOpenCurrentFile(zip_source) != UNZ_OK) {
 		    ERR_FAIL_V_MSG(FAILED, "Could not open file within zip archive.");
 	    }
-
         unzReadCurrentFile(zip_source, data.write().ptr(), info.uncompressed_size);
         String file_path = tmp_dir + file_name;
         da->make_dir_recursive(file_path.get_base_dir());
@@ -330,7 +321,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_s3tc")) {
-
 			_save_tex(p_save_path + ".s3tc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_S3TC, mipmaps, tex_flags);
             doc->set_atlas(ResourceLoader::load(p_save_path + ".s3tc.ftex"));
@@ -341,7 +331,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_etc2")) {
-
             _save_tex(p_save_path + ".etc2.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_ETC2, mipmaps, tex_flags);
             doc->set_atlas(ResourceLoader::load(p_save_path + ".etc2.ftex"));
@@ -351,7 +340,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_etc")) {
-
             _save_tex(p_save_path + ".etc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_ETC, mipmaps, tex_flags);
             doc->set_atlas(ResourceLoader::load(p_save_path + ".etc.ftex"));
@@ -361,7 +349,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_pvrtc")) {
-
             _save_tex(p_save_path + ".pvrtc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_PVRTC4, mipmaps, tex_flags);
             doc->set_atlas(ResourceLoader::load(p_save_path + ".pvrtc.ftex"));
@@ -371,11 +358,9 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (!ok_on_pc) {
-
 			//EditorNode::add_io_error("Warning, no suitable PC VRAM compression enabled in Project Settings. This texture will not display correctly on PC.");
 		}
 	} else {
-
 		//import normally
         _save_tex(p_save_path + ".ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_S3TC /*this is ignored */, mipmaps, tex_flags);
@@ -391,7 +376,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		metadata["vram_texture"] = compress_mode == COMPRESS_VIDEO_RAM;
 		if (formats_imported.size()) {
 			metadata["imported_formats"] = formats_imported;
-
 		}
 		*r_metadata = metadata;
 	}
