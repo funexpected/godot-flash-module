@@ -136,58 +136,40 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 	if (srgb == 1)
 		tex_flags |= Texture::FLAG_CONVERT_TO_LINEAR;
 
-    WARN_PRINT(String("Importing ") + p_source_file);
-
-
     // read zip and extract it to tmp dir
     //const Vector2 PADDING(1, 1);
     FileAccess *zip_source_file;
     zlib_filefunc_def io = zipio_create_io_from_file(&zip_source_file);
-
     zipFile zip_source = unzOpen2(p_source_file.utf8().get_data(), &io);
 
-    WARN_PRINT(String("zip_source = ") + itos((int64_t) zip_source));
-
-
     Error err;
-	FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
+    FileAccess *f = FileAccess::open(p_source_file, FileAccess::READ, &err);
 	
-	//if (!file_exists(p_source_file)) {
-    //    WARN_PRINT( "File doesn't exist.");
-    //}
-
-
     if (!f)
     {
-        WARN_PRINT(String("File not found"));
+        WARN_PRINT(String("File not found: " + p_source_file));
         // file not found
 	}
      else
     {   
-        WARN_PRINT(String("File size: ") + itos(f->get_len()));
-        //WARN_PRINT(String("File size: ") + itos(io->get_len()));
-
+        print_verbose(String("File size: ") + itos(f->get_len()));
     }
 
 
 
 
     if (zip_source == NULL) return FAILED;
-    WARN_PRINT(itos(__LINE__));
 
 
 
     DirAccess *da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
     String tmp_dir = p_save_path + ".tmp/";
     da->make_dir_recursive(tmp_dir);
-    WARN_PRINT(itos(__LINE__));
 
     if (unzGoToFirstFile(zip_source) != UNZ_OK) {
-        WARN_PRINT(itos(__LINE__));
-
+        WARN_PRINT(String("Could not open archive: " + p_source_file));
 		return FAILED;
 	}
-    WARN_PRINT(itos(__LINE__));
 
     String document_path = "";
     do {
@@ -201,7 +183,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         if (unzOpenCurrentFile(zip_source) != UNZ_OK) {
 		    ERR_FAIL_V_MSG(FAILED, "Could not open file within zip archive.");
 	    }
-        WARN_PRINT(itos(__LINE__));
 
         unzReadCurrentFile(zip_source, data.write().ptr(), info.uncompressed_size);
         String file_path = tmp_dir + file_name;
@@ -217,19 +198,13 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     } while (unzGoToNextFile(zip_source) == UNZ_OK);
     if (document_path == "") {
         da->remove(tmp_dir);
-        WARN_PRINT(itos(__LINE__));
-
         return FAILED;
     }
-
-    WARN_PRINT(itos(__LINE__));
 
     // parse document
     Ref<FlashDocument> doc = FlashDocument::from_file(document_path);
     if (!doc.is_valid()) {
         da->remove(tmp_dir);
-        WARN_PRINT(itos(__LINE__));
-
         return FAILED;
     }
 
@@ -275,14 +250,12 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
     //     da->remove(tmp_dir);
     //     return imported;
     // }
-    WARN_PRINT(itos(__LINE__));
 
     String spritesheet_files_path = doc->get_document_path() + "/spritesheets.list";
     Vector<String> spritesheet_files = FileAccess::get_file_as_string(spritesheet_files_path).split("\n");
     while (spritesheet_files.size() > 0 && spritesheet_files[spritesheet_files.size()-1] == String()) {
         spritesheet_files.remove(spritesheet_files.size()-1);
     }
-    WARN_PRINT(itos(__LINE__));
 
     Vector<Ref<Image>> spritesheet_images;
     Dictionary spritesheets_layout;
@@ -319,7 +292,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
         //img->optimize_channels();
         spritesheet_images.push_back(img);
     }
-    WARN_PRINT(itos(__LINE__));
 
     Array items = doc->get_bitmaps().values();
     for (int i=0; i<items.size(); i++){
@@ -347,7 +319,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 
         item->set_texture(frame);
     }
-    WARN_PRINT(itos(__LINE__));
 
     String extension = get_save_extension();
     Array formats_imported;
@@ -359,7 +330,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_s3tc")) {
-    WARN_PRINT(itos(__LINE__));
 
 			_save_tex(p_save_path + ".s3tc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_S3TC, mipmaps, tex_flags);
@@ -371,7 +341,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_etc2")) {
-    WARN_PRINT(itos(__LINE__));
 
             _save_tex(p_save_path + ".etc2.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_ETC2, mipmaps, tex_flags);
@@ -382,7 +351,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_etc")) {
-    WARN_PRINT(itos(__LINE__));
 
             _save_tex(p_save_path + ".etc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_ETC, mipmaps, tex_flags);
@@ -393,7 +361,6 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (ProjectSettings::get_singleton()->get("rendering/vram_compression/import_pvrtc")) {
-    WARN_PRINT(itos(__LINE__));
 
             _save_tex(p_save_path + ".pvrtc.ftex", spritesheet_images,
                 compress_mode, Image::COMPRESS_PVRTC4, mipmaps, tex_flags);
@@ -404,12 +371,10 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
 		if (!ok_on_pc) {
-    WARN_PRINT(itos(__LINE__));
 
 			//EditorNode::add_io_error("Warning, no suitable PC VRAM compression enabled in Project Settings. This texture will not display correctly on PC.");
 		}
 	} else {
-    WARN_PRINT(itos(__LINE__));
 
 		//import normally
         _save_tex(p_save_path + ".ftex", spritesheet_images,
@@ -426,12 +391,10 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		metadata["vram_texture"] = compress_mode == COMPRESS_VIDEO_RAM;
 		if (formats_imported.size()) {
 			metadata["imported_formats"] = formats_imported;
-    WARN_PRINT(itos(__LINE__));
 
 		}
 		*r_metadata = metadata;
 	}
-    WARN_PRINT(itos(__LINE__));
 
 	return OK;
 
