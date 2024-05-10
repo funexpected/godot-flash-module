@@ -33,7 +33,7 @@ RID FlashPlayer::flash_shader = RID();
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
         case NOTIFICATION_ENTER_TREE : {
-            if (!resource->get_atlas().is_valid()) {
+            if (!resource.is_valid() || !resource->get_atlas().is_valid()) {
                 print_line("invalid flash atlas");
                 return;
             }
@@ -360,7 +360,7 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     playback_end = 0;
     frame_overrides.clear();
     active_variants.clear();
-    if (!resource->get_atlas().is_valid()) {
+    if (!resource.is_valid() || !resource->get_atlas().is_valid()) {
         print_line("invalid flash atlas");
         return;
     }
