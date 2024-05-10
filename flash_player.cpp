@@ -22,9 +22,10 @@
 
 
 #include "flash_player.h"
+#include "core/math/geometry_2d.h"
 
 #ifdef TOOLS_ENABLED
-#include <core/engine.h>
+#include <core/config/engine.h>
 #endif
 
 RID FlashPlayer::flash_shader = RID();
@@ -32,16 +33,20 @@ RID FlashPlayer::flash_shader = RID();
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
         case NOTIFICATION_ENTER_TREE : {
+            if (!resource->get_atlas().is_valid()) {
+                print_line("invalid flash atlas");
+                return;
+            }
             if (!clipping_texture.is_valid()) {
-                clipping_texture.instance();
-                clipping_data.instance();
-                clipping_data->create(32, 32, false, Image::FORMAT_RGBAH);
+                clipping_texture.instantiate();
+                clipping_data.instantiate();
+                clipping_data->initialize_data(32, 32, false, Image::FORMAT_RGBAH);
                 clipping_texture->create_from_image(clipping_data);
-                VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
+                RS::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture->get_rid());
             }
             if (resource.is_valid()) {
-                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
-                VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
+                RS::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
+                RS::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas()->get_rid());
             }
         } break;
         case NOTIFICATION_READY: {
@@ -58,20 +63,20 @@ void FlashPlayer::_notification(int p_what) {
         case NOTIFICATION_DRAW: {
             if (active_symbol.is_valid() && points.size() > 0 && resource.is_valid()) {
                 update_clipping_data();
-                VisualServer::get_singleton()->mesh_clear(mesh);
+                RS::get_singleton()->mesh_clear(mesh);
                 Array arrays;
                 arrays.resize(Mesh::ARRAY_MAX);
                 arrays[Mesh::ARRAY_VERTEX] = points;
                 arrays[Mesh::ARRAY_INDEX] = indices;
                 arrays[Mesh::ARRAY_COLOR] = colors;
                 arrays[Mesh::ARRAY_TEX_UV] = uvs;
-                VisualServer::get_singleton()->mesh_add_surface_from_arrays(
+                RS::get_singleton()->mesh_add_surface_from_arrays(
                     mesh,
-                    VisualServer::PRIMITIVE_TRIANGLES,
-                    arrays, Array(),
-                    VisualServer::ARRAY_FLAG_USE_2D_VERTICES
+                    RS::PRIMITIVE_TRIANGLES,
+                    arrays, Array(), Dictionary(),
+                    RS::ARRAY_FLAG_USE_2D_VERTICES
                 );
-                VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh);
+                RS::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh);
                 performance_triangles_drawn = indices.size() / 3;
             }
         } break;
@@ -91,7 +96,7 @@ void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
     if (p_value.get_type() == Variant::NIL) {
         frame_overrides.set(symbol->get_variation_idx(), -1);
         queue_process();
-    } else if (p_value.get_type() == Variant::REAL || p_value.get_type() == Variant::INT) {
+    } else if (p_value.get_type() == Variant::FLOAT || p_value.get_type() == Variant::INT) {
         frame_overrides.set(symbol->get_variation_idx(), p_value);
         queue_process();
     }
@@ -139,7 +144,7 @@ void FlashPlayer::set_clip(String clip, Variant value) {
         if(active_clips.has(clip)) active_clips.erase(clip);
     } else {
         String *track_clip = active_clips.getptr(clip);
-        if (track_clip == NULL || *track_clip == value) return;
+        if (track_clip == NULL || Variant(*track_clip) == value) return;
         active_clips[clip] = value;
         Array timelines = resource->get_symbols().values();
         for (int i=0; i<timelines.size(); i++) {
@@ -172,6 +177,9 @@ float FlashPlayer::get_symbol_frame(FlashTimeline* p_symbol, float p_default) {
         return p_default;
     }
 
+    if (frame_overrides.size() <= p_symbol->get_variation_idx()) {
+        return p_default;
+    }
     float frame = frame_overrides[p_symbol->get_variation_idx()];
     return frame < 0 ? p_default : frame;
 }
@@ -244,17 +252,18 @@ void FlashPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
         }
     }
     List<String> clip_keys;
-    clips.get_key_list(&clip_keys);
-    for (List<String>::Element *E = clip_keys.front(); E; E = E->next()) {
-        String clips_key = E->get();
+    HashMap<String, PackedStringArray>::ConstIterator E = clips.begin();
+    while (E) {
+        String clips_key = E->key;
         Vector<String> timeline_clips = clips[clips_key];
         timeline_clips.insert(0, "[default]");
         p_list->push_back(PropertyInfo(Variant::STRING, "clips/" + clips_key, PROPERTY_HINT_ENUM, String(",").join(timeline_clips)));
+        ++E;
     }
 }
 
-PoolStringArray FlashPlayer::get_clips_tracks() const {
-    PoolStringArray result;
+PackedStringArray FlashPlayer::get_clips_tracks() const {
+    PackedStringArray result;
     Dictionary unique;
     if (!resource.is_valid()) return result;
     Array timelines = resource->get_symbols().values();
@@ -270,8 +279,8 @@ PoolStringArray FlashPlayer::get_clips_tracks() const {
     return result;
 }
 
-PoolStringArray FlashPlayer::get_clips_for_track(const String &track) const {
-    PoolStringArray result;
+PackedStringArray FlashPlayer::get_clips_for_track(const String &track) const {
+    PackedStringArray result;
     Dictionary cache;
     if (!resource.is_valid()) return result;
     Array timelines = resource->get_symbols().values();
@@ -316,23 +325,22 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
             if (clips.size() > 0) {
                 prop.usage = PROPERTY_USAGE_DEFAULT;
             } else {
-                prop.usage = PROPERTY_USAGE_NOEDITOR;
+                prop.usage = PROPERTY_USAGE_NO_EDITOR;
                 return;
             }
-
-            clips.sort_custom((FlashPlayer*)this, "_sort_clips");
+            clips.sort_custom(Callable((FlashPlayer*)this, "_sort_clips"));
             for (int i=0; i<clips.size(); i++){
                 String clip = clips[i];
                 clips_hint += "," + clip;
             }
             prop.hint_string = clips_hint;
         } else {
-            prop.usage = PROPERTY_USAGE_NOEDITOR;
+            prop.usage = PROPERTY_USAGE_NO_EDITOR;
         }
     }
 
     if (prop.name == "material" || prop.name == "use_parent_material") {
-        prop.usage = PROPERTY_USAGE_NOEDITOR|PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
+        prop.usage = PROPERTY_USAGE_NO_EDITOR|PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
     }
 
 }
@@ -352,19 +360,27 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
     playback_end = 0;
     frame_overrides.clear();
     active_variants.clear();
+    if (!resource->get_atlas().is_valid()) {
+        print_line("invalid flash atlas");
+        return;
+    }
     if (resource.is_valid()) {
+
         frame_overrides.resize(resource->get_variated_symbols_count());
-        for (int i=0; i<frame_overrides.size(); i++) { frame_overrides.set(i, -1); }
+        for (int i=0; i<frame_overrides.size(); i++) {
+            frame_overrides.set(i, -1); 
+        }
         active_symbol = resource->get_main_timeline();
         if (active_symbol.is_valid())
             playback_end = active_symbol->get_duration();
-        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
-        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
+        RS::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
+        RS::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas()->get_rid());
     } else {
         frame_overrides.resize(0);
     }
     queue_process();
-    _change_notify();
+    notify_property_list_changed();
+    // _change_notify();
     emit_signal("resource_changed");
 }
 
@@ -399,7 +415,7 @@ void FlashPlayer::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing", PROPERTY_HINT_NONE, ""), "set_playing", "is_playing");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop", PROPERTY_HINT_NONE, ""), "set_loop", "is_loop");
-    ADD_PROPERTY(PropertyInfo(Variant::REAL, "frame_rate", PROPERTY_HINT_NONE, ""), "set_frame_rate", "get_frame_rate");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frame_rate", PROPERTY_HINT_NONE, ""), "set_frame_rate", "get_frame_rate");
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "resource", PROPERTY_HINT_RESOURCE_TYPE, "FlashDocument"), "set_resource", "get_resource");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_symbol", PROPERTY_HINT_ENUM, ""), "set_active_symbol", "get_active_symbol");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
@@ -413,8 +429,8 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_active_label"), &FlashPlayer::get_active_clip);
     ClassDB::bind_method(D_METHOD("set_active_timeline", "active_timeline"), &FlashPlayer::set_active_symbol);
     ClassDB::bind_method(D_METHOD("get_active_timeline"), &FlashPlayer::get_active_symbol);
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_label", "get_active_label");
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NOEDITOR), "set_active_timeline", "get_active_timeline");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_label", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NO_EDITOR), "set_active_label", "get_active_label");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_timeline", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_NO_EDITOR), "set_active_timeline", "get_active_timeline");
 
 }
 
@@ -445,7 +461,7 @@ void FlashPlayer::set_active_symbol(String p_value) {
         playback_end = 0;
     }
     queue_process();
-    _change_notify();
+    notify_property_list_changed();
 }
 String FlashPlayer::get_active_symbol() const {
     return active_symbol_name == String() ? "[document]" : active_symbol_name;
@@ -471,15 +487,15 @@ void FlashPlayer::set_active_clip(String p_value) {
         active_clip = "";
     }
     queue_process();
-    update();
+    queue_redraw();
 }
 
 String FlashPlayer::get_active_clip() const {
     return active_clip == String() ? "[full]" : active_clip;
 }
 
-PoolStringArray FlashPlayer::get_symbols() const {
-    PoolStringArray result;
+PackedStringArray FlashPlayer::get_symbols() const {
+    PackedStringArray result;
     if (!resource.is_valid()) {
         return result;
     }
@@ -492,8 +508,8 @@ PoolStringArray FlashPlayer::get_symbols() const {
     return result;
 }
 
-PoolStringArray FlashPlayer::get_clips(String p_symbol) const {
-    PoolStringArray result;
+PackedStringArray FlashPlayer::get_clips(String p_symbol) const {
+    PackedStringArray result;
     if (!resource.is_valid()) return result;
     Ref<FlashTimeline> symbol;
     if (p_symbol == String()) {
@@ -543,7 +559,7 @@ void FlashPlayer::_animation_process() {
     uvs.resize(0);
 
     if (!active_symbol.is_valid()) {
-        update();
+        queue_redraw();
         animation_process_queued = false;
         queued_delta = 0.0;
         tracks_dirty = false;
@@ -551,7 +567,7 @@ void FlashPlayer::_animation_process() {
     }
 
     active_symbol->animation_process(this, frame, queued_delta);
-    update();
+    queue_redraw();
     performance_triangles_generated = indices.size() / 3;
 
     for (List<String>::Element *E = events.front(); E; E = E->next()) {
@@ -581,10 +597,12 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
 
     
     if (advance_all_frames) {
-        List<String> clip_keys;
-        clips_state.get_key_list(&clip_keys);
-        for (List<String>::Element *E = clip_keys.front(); E; E = E->next()) {
-            String clips_key = E->get();
+        HashMap<String, Vector3>::ConstIterator E = clips_state.begin();
+        while (E) {
+        // List<String> clip_keys;
+        // clips_state.get_key_list(&clip_keys);
+        // for (List<String>::Element *E = clip_keys.front(); E; E = E->next()) {
+            String clips_key = E->key;
             Vector3 *clip = clips_state.getptr(clips_key);
             if (clip == NULL) {
                 continue;
@@ -600,6 +618,7 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
             } else if (loop) while (clip->z > duration) {
                 clip->z -= duration;
             }
+            ++E;
         }
     }
 
@@ -630,7 +649,7 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
 void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_clip, float p_time, bool p_seek, float *r_elapsed, float *r_remaining) {
     if (!resource.is_valid()) return;
 
-    if (p_clip == Variant() || p_clip == "[default]") {
+    if (p_clip == String() || p_clip == "[default]") {
         if(clips_state.has(p_track)) clips_state.erase(p_track);
         if(active_clips.has(p_track)) active_clips.erase(p_track);
         if (r_elapsed != NULL) *r_elapsed = 0.0;
@@ -682,7 +701,7 @@ void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_
 }
 
 void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx) {
-    Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
+    Vector<int> local_indices = Geometry2D::triangulate_polygon(p_points);
     for (int i=0; i<local_indices.size(); i++){
         indices.push_back(local_indices[i] + points.size());
     }
@@ -706,7 +725,7 @@ void FlashPlayer::queue_animation_event(const String &p_event, bool p_reversed) 
 }
 
 void FlashPlayer::update_clipping_data() {
-    clipping_data->lock();
+    // clipping_data->lock();
     Vector2i pos = Vector2i(0, 0);
     Transform2D scale;
     //scale.scale(Vector2(2.0, 2.0));
@@ -733,13 +752,13 @@ void FlashPlayer::update_clipping_data() {
             if (pos.y >= 32) break;
         }
     }
-    clipping_data->unlock();
-    clipping_texture->set_data(clipping_data);
+    // clipping_data->unlock();
+    clipping_texture->set_image(clipping_data);
 }
 
 void FlashPlayer::mask_begin(int mask_id) {
     if (!current_mask) current_mask = mask_id;
-    masks.set(current_mask, List<FlashMaskItem>());
+    masks[current_mask] = List<FlashMaskItem>();
     mask_stack.push_back(mask_id);
 }
 void FlashPlayer::mask_end(int mask_id) {
@@ -761,13 +780,12 @@ void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region, int
     item.texture_region = p_texture_region;
     item.transform = p_transform;
     if (!masks.has(current_mask)) {
-        masks.set(current_mask, List<FlashMaskItem>());
+        masks[current_mask] = List<FlashMaskItem>();
     }
     masks[current_mask].push_back(item);
 }
 void FlashPlayer::clip_begin(int mask_id) {
     if (!masks.has(mask_id)) {
-        print_line("No flash mask found, id=" + itos(mask_id));
         return;
     }
     for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
@@ -788,7 +806,7 @@ void FlashPlayer::clip_end(int mask_id) {
 }
 
 FlashPlayer::~FlashPlayer() {
-    VisualServer *vs = VisualServer::get_singleton();
+    RS *vs = RS::get_singleton();
     vs->free(flash_material);
     vs->free(mesh);
 }
@@ -813,11 +831,10 @@ FlashPlayer::FlashPlayer() {
     performance_triangles_generated = 0;
     performance_triangles_drawn = 0;
 
-    VisualServer *vs = VisualServer::get_singleton();
+    RS *vs = RS::get_singleton();
     flash_material = vs->material_create();
     mesh = vs->mesh_create();
     if (flash_shader == RID()) {
-        print_line("creating new shader");
         flash_shader = vs->shader_create();
         vs->shader_set_code(flash_shader,
             "shader_type canvas_item;\n"
@@ -853,7 +870,8 @@ FlashPlayer::FlashPlayer() {
             "           vec4(0.0, 0.0, 1.0, 0.0),\n"
             "           vec4(tr_origin.r, tr_origin.g, 0.0, 1.0)\n"
             "       );\n"
-            "       mat4 local = tr * WORLD_MATRIX * EXTRA_MATRIX;\n"
+            // "       mat4 local = tr * WORLD_MATRIX * EXTRA_MATRIX;\n"
+            "       mat4 local = tr * CANVAS_MATRIX;\n"
             "       vec2 clipping_pos = (local * vec4(VERTEX, 0.0 ,1.0)).xy;\n"
             "       CLIPPING_UV[i].xy = clipping_pos / tex_size;\n"
             "       CLIPPING_UV[i].zw = (clipping_pos + tex_pos)/ATLAS_SIZE;\n"

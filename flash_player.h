@@ -96,14 +96,14 @@ public:
     ~FlashPlayer();
 
     float get_frame() const { return frame; }
-    void set_frame(float p_frame) { frame = p_frame; update(); }
+    void set_frame(float p_frame) { frame = p_frame; queue_redraw(); }
     void override_frame(String p_symbol, Variant p_frame);
     void set_variant(String key, Variant value);
     String get_variant(String key) const;
     void set_clip(String header, Variant value);
     String get_clip(String header) const;
-    PoolStringArray get_clips_tracks() const;
-    PoolStringArray get_clips_for_track(const String &track) const;
+    PackedStringArray get_clips_tracks() const;
+    PackedStringArray get_clips_for_track(const String &track) const;
     float get_clip_duration(const String &track, const String &clip) const;
     Dictionary get_variants() const;
     float get_symbol_frame(FlashTimeline* symbol, float p_default);
@@ -120,8 +120,8 @@ public:
     void set_active_symbol(String p_symbol);
     String get_active_clip() const;
     void set_active_clip(String p_clip);
-    PoolStringArray get_symbols() const;
-    PoolStringArray get_clips(String p_symbol=String()) const;
+    PackedStringArray get_symbols() const;
+    PackedStringArray get_clips(String p_symbol=String()) const;
 
     // batcher part
     void queue_animation_process();

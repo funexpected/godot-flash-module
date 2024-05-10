@@ -21,16 +21,18 @@
 // SOFTWARE.
 
 
-#include <core/class_db.h>
-#include <core/project_settings.h>
+#include <core/object/class_db.h>
+#include <core/config/project_settings.h>
 #include "register_types.h"
 #include "flash_player.h"
 #include "flash_resources.h"
+#ifdef MODULE_FLASH_WITH_ANIMATION_NODES
 #include "animation_node_flash.h"
+#endif
 
 #ifdef TOOLS_ENABLED
-#include "core/engine.h"
-#include "editor/editor_export.h"
+#include "core/config/engine.h"
+#include "editor/export/editor_export.h"
 #include "editor/editor_node.h"
 #include "resource_importer_flash.h"
 
@@ -40,22 +42,22 @@ class EditorExportFlash : public EditorExportPlugin {
 	bool export_processed;
 
 public:
-	virtual void _export_begin(const Set<String> &p_features, bool p_debug, const String &p_path, int p_flags) {
+	virtual void _export_begin(const HashSet<String> &p_features, bool p_debug, const String &p_path, int p_flags) {
 		export_processed = false;
 	}
 
 
-	virtual void _export_file(const String &p_path, const String &p_type, const Set<String> &p_features) {
+	virtual void _export_file(const String &p_path, const String &p_type, const HashSet<String> &p_features) {
 		if (p_type != "FlashDocument") return;
 		Ref<ConfigFile> config;
-		config.instance();
+		config.instantiate();
 		Error err = config->load(p_path + ".import");
 		if (err != OK) return;
 
 		List<String> remaps;
 		config->get_section_keys("remap", &remaps);
 
-		Set<String> remap_features;
+		HashSet<String> remap_features;
 
 		for (List<String>::Element *F = remaps.front(); F; F = F->next()) {
 
@@ -70,14 +72,14 @@ public:
 			String remap = F->get();
 			if (remap == "path") {
 				String imported_doc_path = config->get_value("remap", remap);
-				String texture_path = imported_doc_path.substr(0, imported_doc_path.length()-3) + "ftex";
-				add_file(texture_path, FileAccess::get_file_as_array(texture_path), false);
+				String texture_path = imported_doc_path.substr(0, imported_doc_path.length()-3) + "ctexarray";
+				add_file(texture_path, FileAccess::get_file_as_bytes(texture_path), false);
 			} else if (remap.begins_with("path.")) {
 				String feature = remap.get_slice(".", 1);
 				if (remap_features.has(feature)) {
 					String imported_doc_path = config->get_value("remap", remap);
-					String texture_path = imported_doc_path.substr(0, imported_doc_path.length()-3) + "ftex";
-					add_file(texture_path, FileAccess::get_file_as_array(texture_path), false);
+					String texture_path = imported_doc_path.substr(0, imported_doc_path.length()-3) + "ctexarray";
+					add_file(texture_path, FileAccess::get_file_as_bytes(texture_path), false);
 				}
 			}
 		}
@@ -86,19 +88,19 @@ public:
 
 static void _editor_init() {
 	Ref<ResourceImporterFlash> flash_import;
-	flash_import.instance();
+	flash_import.instantiate();
 	ResourceFormatImporter::get_singleton()->add_importer(flash_import);
 
 	Ref<EditorExportFlash> flash_export;
-	flash_export.instance();
+	flash_export.instantiate();
 	EditorExport::get_singleton()->add_export_plugin(flash_export);
 }
 #endif
 
 
-Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
+// Ref<ResourceFormatLoaderFlashTexture> resource_loader_flash_texture;
 
-void register_flash_types() {
+void initialize_flash_module(ModuleInitializationLevel p_level) {
 	// core flash classes
 	ClassDB::register_class<FlashPlayer>();
 #ifdef MODULE_FLASH_WITH_ANIMATION_NODES
@@ -107,7 +109,7 @@ void register_flash_types() {
 #endif
 
 	// resources
-	ClassDB::register_virtual_class<FlashElement>();
+	ClassDB::register_abstract_class<FlashElement>();
 	ClassDB::register_class<FlashTextureRect>();
 	ClassDB::register_class<FlashDocument>();
 	ClassDB::register_class<FlashBitmapItem>();
@@ -123,15 +125,15 @@ void register_flash_types() {
 
 
 	// loader
-	resource_loader_flash_texture.instance();
-	ResourceLoader::add_resource_format_loader(resource_loader_flash_texture);
+	// resource_loader_flash_texture.instantiate();
+	// ResourceLoader::add_resource_format_loader(resource_loader_flash_texture);
 
 #ifdef TOOLS_ENABLED
 	EditorNode::add_init_callback(_editor_init);
 #endif
 }
 
-void unregister_flash_types() {
-	ResourceLoader::remove_resource_format_loader(resource_loader_flash_texture);
-	resource_loader_flash_texture.unref();
+void uninitialize_flash_module(ModuleInitializationLevel p_level) {
+	// ResourceLoader::remove_resource_format_loader(resource_loader_flash_texture);
+	// resource_loader_flash_texture.unref();
 }

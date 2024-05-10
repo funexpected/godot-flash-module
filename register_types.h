@@ -19,6 +19,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-void register_flash_types();
-void unregister_flash_types();
+#include "modules/register_module_types.h"
+void initialize_flash_module(ModuleInitializationLevel p_level);
+void uninitialize_flash_module(ModuleInitializationLevel p_level);
+// void register_flash_types();
+// void unregister_flash_types();

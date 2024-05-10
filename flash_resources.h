@@ -23,10 +23,11 @@
 #ifndef FLASH_RESOURCES_H
 #define FLASH_RESOURCES_H
 
-#include <core/resource.h>
+#include <core/io/resource.h>
 #include <core/io/xml_parser.h>
-#include <scene/resources/texture.h>
+#include <scene/resources/image_texture.h>
 #include <scene/resources/material.h>
+#include <scene/resources/compressed_texture.h>
 
 #include "flash_player.h"
 
@@ -47,8 +48,8 @@ struct FlashColorEffect {
 
     inline FlashColorEffect interpolate(FlashColorEffect effect, float amount) {
         FlashColorEffect new_effect;
-        new_effect.mult = mult.linear_interpolate(effect.mult, amount);
-        new_effect.add = add.linear_interpolate(effect.add, amount);
+        new_effect.mult = mult.lerp(effect.mult, amount);
+        new_effect.add = add.lerp(effect.add, amount);
         return new_effect;
     }
 
@@ -132,7 +133,7 @@ class FlashDocument: public FlashElement {
     float frame_size;
     List <Ref<FlashTimeline>> timelines;
     int last_eid;
-    Ref<TextureArray> atlas;
+    Ref<CompressedTexture2DArray> atlas;
     Dictionary variants;
     int variated_symbols_count;
 
@@ -153,8 +154,8 @@ public:
     Error load_file(const String &path);
 
     Vector2 get_atlas_size() const;
-    Ref<TextureArray> get_atlas() const { return atlas; }
-    void set_atlas(Ref<TextureArray> p_atlas) { atlas = p_atlas; }
+    Ref<CompressedTexture2DArray> get_atlas() const { return atlas; }
+    void set_atlas(Ref<CompressedTexture2DArray> p_atlas) { atlas = p_atlas; }
     String get_document_path() const { return document_path; }
     Dictionary get_symbols() const { return symbols; }
     void set_symbols(Dictionary p_symbols) { symbols = p_symbols; }
@@ -349,8 +350,8 @@ public:
     void set_keymode(String p_keymode) { keymode = p_keymode; }
     String get_tween_type() const { return tween_type; }
     void set_tween_type(String p_tween_type) { tween_type = p_tween_type; }
-    PoolColorArray get_color_effect() const;
-    void set_color_effect(PoolColorArray p_color_effect);
+    PackedColorArray get_color_effect() const;
+    void set_color_effect(PackedColorArray p_color_effect);
     Array get_elements();
     void set_elements(Array p_elements);
     Array get_tweens();
@@ -394,8 +395,8 @@ public:
     void set_first_frame(int p_first_frame) { first_frame = p_first_frame; }
     String get_loop() const { return loop; }
     void set_loop(String p_loop) { loop = p_loop; }
-    PoolColorArray get_color_effect() const;
-    void set_color_effect(PoolColorArray p_color_effect);
+    PackedColorArray get_color_effect() const;
+    void set_color_effect(PackedColorArray p_color_effect);
     String get_timeline_token() const { return timeline_token; }
     void set_timeline_token(String p_name) { timeline_token = p_name; }
     String get_layer_name() const { return layer_name; }
@@ -473,7 +474,7 @@ public:
 
 private:
     String target;
-    PoolVector2Array points;
+    PackedVector2Array points;
     Method method;
     float intensity;
 
@@ -492,8 +493,8 @@ public:
     void set_method(Method p_method) { method = p_method; }
     float get_intensity() const { return intensity; }
     void set_intensity(float p_intesity) { intensity = p_intesity; }
-    PoolVector2Array get_points() const { return points; }
-    void set_points(PoolVector2Array p_points) { points = p_points; }
+    PackedVector2Array get_points() const { return points; }
+    void set_points(PackedVector2Array p_points) { points = p_points; }
 
     Error parse(Ref<XMLParser> xml);
 
@@ -504,7 +505,7 @@ VARIANT_ENUM_CAST(FlashTween::Method);
 
 class ResourceFormatLoaderFlashTexture: public ResourceFormatLoader {
 public:
-    virtual RES load(const String &p_path, const String &p_original_path = "", Error *r_error = NULL);
+    virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = NULL);
     virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual String get_resource_type(const String &p_path) const;
