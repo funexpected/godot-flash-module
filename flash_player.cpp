@@ -398,6 +398,9 @@ void FlashPlayer::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("_animation_process"), &FlashPlayer::_animation_process);
 
+    ClassDB::bind_method(D_METHOD("advance_clip_for_track", "p_track", "p_clip", "p_time", "p_seek"), &FlashPlayer::advance_clip_for_track_wrapper);
+    ClassDB::bind_method(D_METHOD("advance", "p_time", "p_seek", "advance_all_frames"), &FlashPlayer::advance);
+
     ClassDB::bind_method(D_METHOD("_sort_clips"), &FlashPlayer::_sort_clips);
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing", PROPERTY_HINT_NONE, ""), "set_playing", "is_playing");
@@ -410,6 +413,11 @@ void FlashPlayer::_bind_methods() {
     ADD_SIGNAL(MethodInfo("resource_changed"));
     ADD_SIGNAL(MethodInfo("animation_completed"));
     ADD_SIGNAL(MethodInfo("animation_event", PropertyInfo(Variant::STRING, "name")));
+
+    ADD_SIGNAL(MethodInfo("advance_called", PropertyInfo(Variant::REAL, "p_time"), PropertyInfo(Variant::BOOL, "p_seek"), PropertyInfo(Variant::BOOL, "advance_all_frames")));
+    ADD_SIGNAL(MethodInfo("advance_clip_for_track_called", PropertyInfo(Variant::STRING, "p_track"), PropertyInfo(Variant::STRING, "p_clip"), PropertyInfo(Variant::REAL, "p_time"), PropertyInfo(Variant::BOOL, "p_seek")));
+    ADD_SIGNAL(MethodInfo("set_active_symbol_called", PropertyInfo(Variant::STRING, "p_value")));
+    ADD_SIGNAL(MethodInfo("set_active_clip_called", PropertyInfo(Variant::STRING, "p_value")));
 
     // compatiblity
     ClassDB::bind_method(D_METHOD("set_active_label", "active_label"), &FlashPlayer::set_active_clip);
@@ -426,7 +434,8 @@ float FlashPlayer::get_duration(String p_symbol, String p_clip) {
     return resource->get_duration(p_symbol, p_clip);
 }
 
-void FlashPlayer::set_active_symbol(String p_value) {
+void FlashPlayer::set_active_symbol(String p_value) {    
+    emit_signal("set_active_symbol_called", p_value);
     if (p_value == "[document]") p_value = "";
     if (active_symbol_name == p_value) return;
     active_symbol_name = p_value;
@@ -455,6 +464,7 @@ String FlashPlayer::get_active_symbol() const {
 }
 
 void FlashPlayer::set_active_clip(String p_value) {
+    emit_signal("set_active_clip_called", p_value);
     if (p_value == "[full]") p_value = "";
     if (active_clip == p_value) return;
     active_clip = p_value;
@@ -574,6 +584,7 @@ void FlashPlayer::_animation_process() {
 
 void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
     if (!active_symbol.is_valid()) return;
+    emit_signal("advance_called", p_time, p_seek, advance_all_frames);
     bool animation_completed = false;
     float delta = p_time*frame_rate;
     if (p_seek) {
@@ -630,9 +641,15 @@ void FlashPlayer::advance(float p_time, bool p_seek, bool advance_all_frames) {
     }
 }
 
+void FlashPlayer::advance_clip_for_track_wrapper(const String &p_track, const String &p_clip, float p_time, bool p_seek) {
+    float r_elapsed, r_remaining;
+    advance_clip_for_track(p_track, p_clip, p_time, p_seek, &r_elapsed, &r_remaining);
+}
+
+
 void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_clip, float p_time, bool p_seek, float *r_elapsed, float *r_remaining) {
     if (!resource.is_valid()) return;
-
+    emit_signal("advance_clip_for_track_called", p_track, p_clip, p_time, p_seek);
     if (p_clip == Variant() || p_clip == "[default]") {
         if(clips_state.has(p_track)) clips_state.erase(p_track);
         if(active_clips.has(p_track)) active_clips.erase(p_track);
