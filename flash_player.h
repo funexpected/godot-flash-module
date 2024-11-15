@@ -129,6 +129,7 @@ public:
     void _animation_process();
     void advance(float p_delta, bool p_skip=false, bool advance_all_tracks=false);
     void advance_clip_for_track(const String &p_track, const String &p_clip, float delta=0.0, bool p_skip=false, float *r_elapsed=NULL, float *r_ramaining=NULL);
+    void advance_clip_for_track_wrapper(const String &p_track, const String &p_clip, float p_time, bool p_seek);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
     void queue_animation_event(const String &p_name, bool p_reversed=false);
