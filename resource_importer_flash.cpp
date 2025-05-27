@@ -34,7 +34,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 13;
+const int ResourceImporterFlash::importer_version = 14;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
@@ -358,10 +358,10 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 		}
 
         Vector<Ref<Image>> empty_images;
-        _save_tex(p_save_path + ".server.ftex", empty_images,
+        _save_tex(p_save_path + ".Server.ftex", empty_images,
             compress_mode, Image::COMPRESS_PVRTC4, mipmaps, tex_flags);
-        doc->set_atlas(ResourceLoader::load(p_save_path + ".server.ftex"));
-        ResourceSaver::save(p_save_path + ".server." + extension, doc);
+        doc->set_atlas(ResourceLoader::load(p_save_path + ".Server.ftex"));
+        ResourceSaver::save(p_save_path + ".Server." + extension, doc);
         r_platform_variants->push_back("Server");
         formats_imported.push_back("Server");
 
