@@ -395,6 +395,8 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_active_symbol"), &FlashPlayer::get_active_symbol);
     ClassDB::bind_method(D_METHOD("set_active_clip", "active_clip"), &FlashPlayer::set_active_clip);
     ClassDB::bind_method(D_METHOD("get_active_clip"), &FlashPlayer::get_active_clip);
+    ClassDB::bind_method(D_METHOD("get_overlay_texture"), &FlashPlayer::get_overlay_texture);
+    ClassDB::bind_method(D_METHOD("set_overlay_texture", "texture"), &FlashPlayer::set_overlay_texture);
 
     ClassDB::bind_method(D_METHOD("_animation_process"), &FlashPlayer::_animation_process);
 
@@ -409,6 +411,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "resource", PROPERTY_HINT_RESOURCE_TYPE, "FlashDocument"), "set_resource", "get_resource");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_symbol", PROPERTY_HINT_ENUM, ""), "set_active_symbol", "get_active_symbol");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "overlay_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture"), "set_overlay_texture", "get_overlay_texture");
 
     ADD_SIGNAL(MethodInfo("resource_changed"));
     ADD_SIGNAL(MethodInfo("animation_completed"));
@@ -489,6 +492,16 @@ void FlashPlayer::set_active_clip(String p_value) {
 
 String FlashPlayer::get_active_clip() const {
     return active_clip == String() ? "[full]" : active_clip;
+}
+
+Ref<Texture> FlashPlayer::get_overlay_texture() const {
+    return overlay_texture;
+}
+
+void FlashPlayer::set_overlay_texture(const Ref<Texture> &p_texture) {
+    overlay_texture = p_texture;
+    VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_ENABLED", overlay_texture.is_valid());
+    VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", overlay_texture);
 }
 
 PoolStringArray FlashPlayer::get_symbols() const {
@@ -845,6 +858,8 @@ FlashPlayer::FlashPlayer() {
             "uniform sampler2DArray ATLAS;\n"
             "uniform sampler2D CLIPPING_TEXTURE;\n"
             "uniform vec2 ATLAS_SIZE;\n"
+            "uniform bool OVERLAY_ENABLED;\n"
+            "uniform sampler2D OVERLAY_TEXTURE;\n"
             "varying float CLIPPING_SIZE;\n"
             "varying float CLIPPING_IDX[4];"
             "varying vec4 CLIPPING_UV[4];\n"
@@ -899,6 +914,9 @@ FlashPlayer::FlashPlayer() {
             "       vec4 c = texture(ATLAS, vec3(UV, TEX_IDX));\n"
             "       vec4 mult = 2.0*modf(COLOR, add);\n"
             "       COLOR = clamp(abs(c * mult) + add / 255.0, vec4(0.0), vec4(1.0));\n"
+            "       if (OVERLAY_ENABLED) {\n"
+            "           COLOR.rgb = texture(OVERLAY_TEXTURE, SCREEN_UV).rgb;\n"
+            "       }"
             "       if (c.a <= 0.0) {\n"
             "           COLOR.a = 0.0;\n"
             "       } else {\n"

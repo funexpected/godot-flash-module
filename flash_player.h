@@ -72,6 +72,7 @@ class FlashPlayer: public Node2D {
     HashMap<String, String> active_clips;
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
+    Ref<Texture> overlay_texture;
     HashMap<int, List<FlashMaskItem>> masks;
     List<int> mask_stack;
     Vector<int> frame_overrides;
@@ -122,6 +123,8 @@ public:
     void set_active_symbol(String p_symbol);
     String get_active_clip() const;
     void set_active_clip(String p_clip);
+    Ref<Texture> get_overlay_texture() const;
+    void set_overlay_texture(const Ref<Texture> &p_texture);
     PoolStringArray get_symbols() const;
     PoolStringArray get_clips(String p_symbol=String()) const;
 
