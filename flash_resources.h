@@ -441,6 +441,9 @@ class FlashBitmapInstance: public FlashDrawing {
     Vector<Vector2> uvs;
     Ref<FlashTextureRect> texture;
 
+    void _animation_process_normal(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect);
+    void _animation_process_metaball(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect);
+
 public:
     FlashBitmapInstance():
         library_item_name(""){}

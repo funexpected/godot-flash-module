@@ -40,6 +40,12 @@ struct FlashMaskItem {
 
 class FlashPlayer: public Node2D {
     GDCLASS(FlashPlayer, Node2D);
+public:
+    enum RenderMode {
+        RENDER_NORMAL,
+        RENDER_METABALL
+    };
+private:
 
     // renderer part
     float frame;
@@ -57,7 +63,11 @@ class FlashPlayer: public Node2D {
     bool loop;
     RID flash_material;
     RID mesh;
-    static RID flash_shader;
+    RenderMode render_mode;
+    float metaballs_threshold;
+    bool metaballs_debug;
+    static RID normal_shader;
+    static RID metaball_shader;
 
     // batcher part
     float processed_frame;
@@ -79,11 +89,19 @@ class FlashPlayer: public Node2D {
     HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
+    List<Vector3> metaballs_cache;
+    Rect2 metaballs_rect;
     int current_mask;
 
 
     int performance_triangles_drawn;
 	int performance_triangles_generated;
+
+    void _generate_normal_shader() const;
+    void _generate_metaball_shader() const;
+    void _draw_normal();
+    void _draw_metaball();
+
 
 protected:
     void _notification(int p_what);
@@ -127,6 +145,20 @@ public:
     void set_overlay_texture(const Ref<Texture> &p_texture);
     PoolStringArray get_symbols() const;
     PoolStringArray get_clips(String p_symbol=String()) const;
+    RenderMode get_render_mode() const { return render_mode; }
+    void set_render_mode(RenderMode p_mode);
+    void set_metaballs_threshold(float p_threshold) {
+        metaballs_threshold = p_threshold;
+    }
+    float get_metaballs_threshold() const {
+        return metaballs_threshold;
+    }
+    bool is_metaballs_debug() const {
+        return metaballs_debug;
+    }
+    void set_metaballs_debug(bool p_debug) {
+        metaballs_debug = p_debug;
+    }
 
     // batcher part
     void queue_animation_process();
@@ -137,6 +169,7 @@ public:
     void advance_clip_for_track_wrapper(const String &p_track, const String &p_clip, float p_time, bool p_seek);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
+    void add_metaball(const Vector2 &p_pos, const float &p_radius);
     void queue_animation_event(const String &p_name, bool p_reversed=false);
 
     bool is_masking();
@@ -148,6 +181,7 @@ public:
     void clip_end(int layer);
 };
 
+VARIANT_ENUM_CAST(FlashPlayer::RenderMode);
 
 #endif
 #endif
