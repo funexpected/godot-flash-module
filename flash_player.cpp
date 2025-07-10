@@ -217,10 +217,8 @@ void FlashPlayer::_generate_metaball_shader() const {
         // "   if (alpha > 0.01) {\n"
         "       if (OVERLAY_ENABLED) {\n"
         "           COLOR.rgb = texture(OVERLAY_TEXTURE, SCREEN_UV).rgb;\n"
-        "           COLOR.a = alpha;\n"
-        "       } else {\n"
-        "           COLOR = vec4(0.2, 0.7, 1.0, alpha);\n"
-        "       }\n"
+        "       }"
+        "       COLOR.a = alpha;\n"
         "   } else {\n"
         "       discard;\n"    
         // "       COLOR = vec4(1.0, 1.0, 1.0, 0.2);\n"
@@ -278,10 +276,10 @@ void FlashPlayer::_draw_metaball() {
     uvs.push_back(Vector2(size.x, 0.0));
     uvs.push_back(Vector2(size.x, size.y));
     uvs.push_back(Vector2(0.0, size.y));
-    colors.push_back(Color(1.0, 1.0, 1.0, 1.0));
-    colors.push_back(Color(1.0, 1.0, 1.0, 1.0));
-    colors.push_back(Color(1.0, 1.0, 1.0, 1.0));
-    colors.push_back(Color(1.0, 1.0, 1.0, 1.0));
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
     indices.push_back(0);
     indices.push_back(1);
     indices.push_back(2);
@@ -630,6 +628,12 @@ void FlashPlayer::set_metaball_weight_balancing(WeightBalancing p_balancing) {
     update();
 }
 
+void FlashPlayer::set_metaball_color(const Color &p_color) {
+    if (metaball_color == p_color) return;
+    metaball_color = p_color;
+    update();
+}
+
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "active_symbol"){
         String symbols_hint = "[document]";
@@ -745,6 +749,8 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_metaball_debug", "debug"), &FlashPlayer::set_metaball_debug);
     ClassDB::bind_method(D_METHOD("set_metaball_weight_balancing", "balancing"), &FlashPlayer::set_metaball_weight_balancing);
     ClassDB::bind_method(D_METHOD("get_metaball_weight_balancing"), &FlashPlayer::get_metaball_weight_balancing);
+    ClassDB::bind_method(D_METHOD("set_metaball_color", "color"), &FlashPlayer::set_metaball_color);
+    ClassDB::bind_method(D_METHOD("get_metaball_color"), &FlashPlayer::get_metaball_color);
     
 
     ClassDB::bind_method(D_METHOD("_animation_process"), &FlashPlayer::_animation_process);
@@ -762,6 +768,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "overlay_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture"), "set_overlay_texture", "get_overlay_texture");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "render_mode", PROPERTY_HINT_ENUM, "Normal,Metaball"), "set_render_mode", "get_render_mode");
+    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "metaball/color", PROPERTY_HINT_COLOR_NO_ALPHA), "set_metaball_color", "get_metaball_color");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "metaball/balancing", PROPERTY_HINT_ENUM, "None,Linear,Exponential"), "set_metaball_weight_balancing", "get_metaball_weight_balancing");
     ADD_PROPERTY(PropertyInfo(Variant::REAL, "metaball/threshold", PROPERTY_HINT_RANGE, "0.1,3.0,0.05"), "set_metaball_threshold", "get_metaball_threshold");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "metaball/debug", PROPERTY_HINT_NONE, ""), "set_metaball_debug", "is_metaball_debug");
@@ -1241,6 +1248,7 @@ FlashPlayer::FlashPlayer() {
     metaball_threshold = 1.0;
     metaball_debug = false;
     metaball_weight_balancing = WEIGHT_BALANCE_EXPONENTIAL;
+    metaball_color = Color(0.415686, 0.352941, 0.788235);
     // vs->material_set_shader(flash_material, normal_shader);
 }
 #endif

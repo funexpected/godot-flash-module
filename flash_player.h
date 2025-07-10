@@ -74,6 +74,7 @@ private:
     float metaball_threshold;
     WeightBalancing metaball_weight_balancing;
     bool metaball_debug;
+    Color metaball_color;
     static RID normal_shader;
     static RID metaball_shader;
 
@@ -167,6 +168,10 @@ public:
         return metaball_weight_balancing;
     }
     void set_metaball_weight_balancing(WeightBalancing p_mode);
+    Color get_metaball_color() const {
+        return metaball_color;
+    }
+    void set_metaball_color(const Color &p_color);
 
     // batcher part
     void queue_animation_process();
