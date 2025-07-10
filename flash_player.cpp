@@ -154,63 +154,46 @@ void FlashPlayer::_generate_metaball_shader() const {
         "uniform float THRESHOLD : hint_range(0.0, 2.0) = 0.3;\n"
         "uniform bool DEBUG_ENABLED;\n"
         "uniform int CIRCLES_COUNT;\n"
-        "uniform vec3 CIRCLE_0;\n"
-        "uniform vec3 CIRCLE_1;\n"
-        "uniform vec3 CIRCLE_2;\n"
-        "uniform vec3 CIRCLE_3;\n"
-        "uniform vec3 CIRCLE_4;\n"
-        "uniform vec3 CIRCLE_5;\n"
-        "uniform vec3 CIRCLE_6;\n"
-        "uniform vec3 CIRCLE_7;\n"
-        "uniform vec3 CIRCLE_8;\n"
-        "uniform vec3 CIRCLE_9;\n"
-        "uniform vec3 CIRCLE_10;\n"
-        "uniform vec3 CIRCLE_11;\n"
-        "uniform vec3 CIRCLE_12;\n"
-        "uniform vec3 CIRCLE_13;\n"
-        "uniform vec3 CIRCLE_14;\n"
-        "uniform vec3 CIRCLE_15;\n"
+        "uniform vec4 CIRCLE_0;\n"
+        "uniform vec4 CIRCLE_1;\n"
+        "uniform vec4 CIRCLE_2;\n"
+        "uniform vec4 CIRCLE_3;\n"
+        "uniform vec4 CIRCLE_4;\n"
+        "uniform vec4 CIRCLE_5;\n"
+        "uniform vec4 CIRCLE_6;\n"
+        "uniform vec4 CIRCLE_7;\n"
+        "uniform vec4 CIRCLE_8;\n"
+        "uniform vec4 CIRCLE_9;\n"
+        "uniform vec4 CIRCLE_10;\n"
+        "uniform vec4 CIRCLE_11;\n"
+        "uniform vec4 CIRCLE_12;\n"
+        "uniform vec4 CIRCLE_13;\n"
+        "uniform vec4 CIRCLE_14;\n"
+        "uniform vec4 CIRCLE_15;\n"
 
         "void fragment() {\n"
         "   vec2 uv = UV;\n"
         "   float v = 0.0;\n"
         "   float debug = 0.0;\n"
-        "   vec3 circles[16] = vec3[](\n"
+        "   vec4 circles[16] = vec4[](\n"
         "       CIRCLE_0, CIRCLE_1, CIRCLE_2, CIRCLE_3,\n"
         "       CIRCLE_4, CIRCLE_5, CIRCLE_6, CIRCLE_7,\n"
         "       CIRCLE_8, CIRCLE_9, CIRCLE_10, CIRCLE_11,\n"
         "       CIRCLE_12, CIRCLE_13, CIRCLE_14, CIRCLE_15\n"
         "   );\n"
         "   for (int i = 0; i < CIRCLES_COUNT; i++) {\n"
-        // "      int idx = i % 4;\n"
-        // "      vec3 item = i == 0  ? CIRCLES_0 :\n"
-        // "                 (i == 1  ? CIRCLES_1 :\n"
-        // "                 (i == 2  ? CIRCLES_2 :\n"
-        // "                 (i == 3  ? CIRCLES_3 :\n"
-        // "                 (i == 4  ? CIRCLES_4 :\n"
-        // "                 (i == 5  ? CIRCLES_5 :\n"
-        // "                 (i == 6  ? CIRCLES_6 :\n"
-        // "                 (i == 7  ? CIRCLES_7 :\n"
-        // "                 (i == 8  ? CIRCLES_8 :\n"
-        // "                 (i == 9  ? CIRCLES_9 :\n"
-        // "                 (i == 10 ? CIRCLES_10:\n"
-        // "                 (i == 10 ? CIRCLES_11:\n"
-        // "                 (i == 12 ? CIRCLES_12:\n"
-        // "                 (i == 13 ? CIRCLES_13:\n"
-        // "                 (i == 14 ? CIRCLES_14:\n"
-        // "                 (i == 15 ? CIRCLES_15: CIRCLES_16\n"
-        // "      ))))))))))))));\n"
         "      vec2 center = circles[i].xy;\n"
         "      float r = circles[i].z;\n"
+        "      float overweight = circles[i].w;\n"
         "      vec2 dir = uv - center;\n"
         // "      float d = dot(dir, dir);\n"
-        "      float d = length(dir);\n"
-        "      v += r * r / (d * d + 0.0001);\n"
-        "      if (d < r + 0.0015 && d > r - 0.0015) {\n"
+        "      float d = dot(dir, dir);\n"
+        "      v += overweight * r / (d + 0.0000001);\n"
+        "      if (d < r + 0.0002 && d > r - 0.0002) {\n"
 		"           debug = max(debug, 1.0);\n"
 		"      }\n"
         "}\n"
-        "v = 0.75 + log(v);\n"
+        // "v = 0.5 + log(v);\n"
         // "v = v / float(CIRCLES_COUNT);\n"
         // // Пример: 3 круга, их центры и радиусы можно передавать через uniform
         // vec2 centers[3] = vec2[](vec2(0.5 + 0.3*sin(TIME),0.5), vec2(
@@ -228,7 +211,7 @@ void FlashPlayer::_generate_metaball_shader() const {
         "   float edge = 0.01;\n"
         "   float alpha = smoothstep(THRESHOLD - edge, THRESHOLD + edge, v);\n"
         "   if (DEBUG_ENABLED && debug > 0.0) {\n"
-        "       COLOR = vec4(0.8, 0.2, 2.0, 1);\n"
+        "       COLOR = vec4(0.9, 0.1, 0.1, 1);\n"
         
         "   } else if (alpha > 0.01) {\n"
         // "   if (alpha > 0.01) {\n"
@@ -248,9 +231,7 @@ void FlashPlayer::_generate_metaball_shader() const {
 }
 
 void FlashPlayer::_draw_normal() {
-    print_line("draw_normal");
     if (active_symbol.is_valid() && points.size() > 0 && resource.is_valid()) {
-        print_line("Points size: " + itos(points.size()));
         update_clipping_data();
         VisualServer::get_singleton()->mesh_clear(mesh);
         Array arrays;
@@ -271,7 +252,6 @@ void FlashPlayer::_draw_normal() {
 }
 
 void FlashPlayer::_draw_metaball() {
-    print_line("draw_metaball");
     if (metaballs_cache.size() == 0) return;
     if (metaballs_rect.size.x <= 0.0 || metaballs_rect.size.y <= 0.0) {
         return; // No metaballs to draw
@@ -330,11 +310,55 @@ void FlashPlayer::_draw_metaball() {
     VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLES_COUNT", metaballs_cache.size());
 
     for (int i=0; i<metaballs_cache.size(); i++){
-        Vector3 circle = Vector3(
+        Vector2 ipos = Vector2(
             (metaballs_cache[i].x - metaballs_rect.position.x) * factor,
-            (metaballs_cache[i].y - metaballs_rect.position.y) * factor,
-            metaballs_cache[i].z * factor
+            (metaballs_cache[i].y - metaballs_rect.position.y) * factor
         );
+        float radius = metaballs_cache[i].z * factor;
+        float balancing_factor = 1.0;
+        if (metaball_weight_balancing == WEIGHT_BALANCE_LINEAR) {
+            balancing_factor = 1.25;
+        } else if (metaball_weight_balancing == WEIGHT_BALANCE_EXPONENTIAL) {
+            balancing_factor = 2.0;
+        }
+        float irad = radius * balancing_factor;
+        float iirad = irad * irad;
+        float overweight = 0.0;
+        float area = Math_PI * iirad;
+        if (metaball_weight_balancing != WEIGHT_BALANCE_NONE) {
+            for (int j=0; j<metaballs_cache.size(); j++) {
+                Vector2 jpos = Vector2(
+                    (metaballs_cache[j].x - metaballs_rect.position.x) * factor,
+                    (metaballs_cache[j].y - metaballs_rect.position.y) * factor
+                );
+                float jrad = metaballs_cache[j].z * factor * balancing_factor;
+                float jjrad = jrad * jrad;
+				float dist = (ipos - jpos).length();
+                float dd = dist * dist;
+                if (dist > irad + jrad) {
+                    continue;
+                }
+				if (dist <= abs(irad - jrad)) {
+					float mrad = fmin(iirad, jjrad);
+					overweight += Math_PI * mrad;
+					continue;
+                }
+				float alpha = 2.0 * acos((dd + iirad - jjrad) / (2.0*dist*irad));
+				float beta = 2.0 * acos((dd + jjrad - iirad) / (2.0*dist*jrad));
+				float s1 = 0.5 * iirad * (alpha - sin(alpha));
+				float s2 = 0.5 * jjrad * (beta  - sin(beta));
+				overweight += s1 + s2;
+            }
+        } else {
+			area = 1.0;
+        }
+        overweight = area / (area + overweight);
+        if (metaball_weight_balancing == WEIGHT_BALANCE_EXPONENTIAL) {
+            overweight = sqrt(overweight);
+        }
+
+        Color circle = Color(ipos.x, ipos.y, radius * radius, overweight);
+
         VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLE_" + itos(i), circle);
     }
     VisualServer::get_singleton()->material_set_param(flash_material, "THRESHOLD", metaballs_threshold);
@@ -566,6 +590,7 @@ void FlashPlayer::set_render_mode(RenderMode p_mode) {
             VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
             VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
         }
+        VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
         VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_ENABLED", overlay_texture.is_valid());
         if (overlay_texture.is_valid()) {
             VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", overlay_texture);
@@ -852,7 +877,6 @@ void FlashPlayer::queue_process(float p_delta) {
 }
 
 void FlashPlayer::_animation_process() {
-    print_line("animation_process");
     if (processed_frame == frame && !tracks_dirty) {
         animation_process_queued = false;
         queued_delta = 0.0;
@@ -1032,10 +1056,12 @@ void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, 
         colors.push_back(p_colors[i]);
         uvs.push_back(p_uvs[i] * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
     }
-    print_line(String("Adding polygon with area") + itos(area) + ", points: " + itos(points.size()));
 }
 
 void FlashPlayer::add_metaball(const Vector2 &p_pos, const float &p_radius) {
+    if (is_masking()) {
+        return;
+    }
     if (metaballs_cache.size() == 0) {
         metaballs_rect = Rect2(p_pos - Vector2(p_radius, p_radius), Vector2(p_radius * 2.0, p_radius * 2.0));    
     } else {
@@ -1175,9 +1201,11 @@ FlashPlayer::FlashPlayer() {
     _generate_normal_shader();
     _generate_metaball_shader();
     VisualServer::get_singleton()->material_set_shader(flash_material, normal_shader);
+    VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
     render_mode = RENDER_NORMAL;
     metaballs_threshold = 1.0;
     metaballs_debug = false;
+    metaball_weight_balancing = WEIGHT_BALANCE_EXPONENTIAL;
     // vs->material_set_shader(flash_material, normal_shader);
 }
 #endif

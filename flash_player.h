@@ -45,6 +45,13 @@ public:
         RENDER_NORMAL,
         RENDER_METABALL
     };
+
+    enum WeightBalancing {
+        WEIGHT_BALANCE_NONE,
+        WEIGHT_BALANCE_LINEAR,
+        WEIGHT_BALANCE_EXPONENTIAL
+    };
+
 private:
 
     // renderer part
@@ -65,6 +72,7 @@ private:
     RID mesh;
     RenderMode render_mode;
     float metaballs_threshold;
+    WeightBalancing metaball_weight_balancing;
     bool metaballs_debug;
     static RID normal_shader;
     static RID metaball_shader;
