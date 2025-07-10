@@ -766,7 +766,7 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "resource", PROPERTY_HINT_RESOURCE_TYPE, "FlashDocument"), "set_resource", "get_resource");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_symbol", PROPERTY_HINT_ENUM, ""), "set_active_symbol", "get_active_symbol");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "overlay_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture"), "set_overlay_texture", "get_overlay_texture");
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "replace_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture"), "set_overlay_texture", "get_overlay_texture");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "render_mode", PROPERTY_HINT_ENUM, "Normal,Metaball"), "set_render_mode", "get_render_mode");
     ADD_PROPERTY(PropertyInfo(Variant::COLOR, "metaball/color", PROPERTY_HINT_COLOR_NO_ALPHA), "set_metaball_color", "get_metaball_color");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "metaball/balancing", PROPERTY_HINT_ENUM, "None,Linear,Exponential"), "set_metaball_weight_balancing", "get_metaball_weight_balancing");
