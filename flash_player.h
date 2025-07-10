@@ -71,9 +71,9 @@ private:
     RID flash_material;
     RID mesh;
     RenderMode render_mode;
-    float metaballs_threshold;
+    float metaball_threshold;
     WeightBalancing metaball_weight_balancing;
-    bool metaballs_debug;
+    bool metaball_debug;
     static RID normal_shader;
     static RID metaball_shader;
 
@@ -97,8 +97,8 @@ private:
     HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
-    List<Vector3> metaballs_cache;
-    Rect2 metaballs_rect;
+    List<Vector3> metaball_cache;
+    Rect2 metaball_rect;
     int current_mask;
 
 
@@ -155,18 +155,18 @@ public:
     PoolStringArray get_clips(String p_symbol=String()) const;
     RenderMode get_render_mode() const { return render_mode; }
     void set_render_mode(RenderMode p_mode);
-    void set_metaballs_threshold(float p_threshold) {
-        metaballs_threshold = p_threshold;
+    void set_metaball_threshold(float p_threshold);
+    float get_metaball_threshold() const {
+        return metaball_threshold;
     }
-    float get_metaballs_threshold() const {
-        return metaballs_threshold;
+    bool is_metaball_debug() const {
+        return metaball_debug;
     }
-    bool is_metaballs_debug() const {
-        return metaballs_debug;
+    void set_metaball_debug(bool p_debug);
+    WeightBalancing get_metaball_weight_balancing() const {
+        return metaball_weight_balancing;
     }
-    void set_metaballs_debug(bool p_debug) {
-        metaballs_debug = p_debug;
-    }
+    void set_metaball_weight_balancing(WeightBalancing p_mode);
 
     // batcher part
     void queue_animation_process();
@@ -190,6 +190,7 @@ public:
 };
 
 VARIANT_ENUM_CAST(FlashPlayer::RenderMode);
+VARIANT_ENUM_CAST(FlashPlayer::WeightBalancing);
 
 #endif
 #endif

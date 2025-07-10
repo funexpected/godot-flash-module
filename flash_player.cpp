@@ -252,28 +252,28 @@ void FlashPlayer::_draw_normal() {
 }
 
 void FlashPlayer::_draw_metaball() {
-    if (metaballs_cache.size() == 0) return;
-    if (metaballs_rect.size.x <= 0.0 || metaballs_rect.size.y <= 0.0) {
-        return; // No metaballs to draw
+    if (metaball_cache.size() == 0) return;
+    if (metaball_rect.size.x <= 0.0 || metaball_rect.size.y <= 0.0) {
+        return; // No metaball to draw
     }
     Vector2 size;
     float factor;
-    metaballs_rect = metaballs_rect.expand(metaballs_rect.position - Vector2(150., 150.));
-    metaballs_rect = metaballs_rect.expand(metaballs_rect.position + metaballs_rect.size + Vector2(150., 150.));
-    if (metaballs_rect.size.x > metaballs_rect.size.y) {
+    metaball_rect = metaball_rect.expand(metaball_rect.position - Vector2(150., 150.));
+    metaball_rect = metaball_rect.expand(metaball_rect.position + metaball_rect.size + Vector2(150., 150.));
+    if (metaball_rect.size.x > metaball_rect.size.y) {
         size.y = 1.0;
-        factor = 1.0 / metaballs_rect.size.y;
-        size.x = metaballs_rect.size.x / metaballs_rect.size.y;
+        factor = 1.0 / metaball_rect.size.y;
+        size.x = metaball_rect.size.x / metaball_rect.size.y;
     } else {
         size.x = 1.0;
-        factor = 1.0 / metaballs_rect.size.x;
-        size.y = metaballs_rect.size.y / metaballs_rect.size.x;
+        factor = 1.0 / metaball_rect.size.x;
+        size.y = metaball_rect.size.y / metaball_rect.size.x;
     }
     
-    points.push_back(metaballs_rect.position);
-    points.push_back(metaballs_rect.position + Vector2(metaballs_rect.size.x, 0.0));
-    points.push_back(metaballs_rect.position + metaballs_rect.size);
-    points.push_back(metaballs_rect.position + Vector2(0.0, metaballs_rect.size.y));
+    points.push_back(metaball_rect.position);
+    points.push_back(metaball_rect.position + Vector2(metaball_rect.size.x, 0.0));
+    points.push_back(metaball_rect.position + metaball_rect.size);
+    points.push_back(metaball_rect.position + Vector2(0.0, metaball_rect.size.y));
     uvs.push_back(Vector2(0.0, 0.0));
     uvs.push_back(Vector2(size.x, 0.0));
     uvs.push_back(Vector2(size.x, size.y));
@@ -290,7 +290,7 @@ void FlashPlayer::_draw_metaball() {
     indices.push_back(3);
 
     // draw_polygon(points, colors, uvs);
-    // draw_rect(metaballs_rect, Color(1.0, 1.0, 1.0, 1.0), true);
+    // draw_rect(metaball_rect, Color(1.0, 1.0, 1.0, 1.0), true);
 
     VisualServer::get_singleton()->mesh_clear(mesh);
     Array arrays;
@@ -307,14 +307,14 @@ void FlashPlayer::_draw_metaball() {
     );
     VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh);
 
-    VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLES_COUNT", metaballs_cache.size());
+    VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLES_COUNT", metaball_cache.size());
 
-    for (int i=0; i<metaballs_cache.size(); i++){
+    for (int i=0; i<metaball_cache.size(); i++){
         Vector2 ipos = Vector2(
-            (metaballs_cache[i].x - metaballs_rect.position.x) * factor,
-            (metaballs_cache[i].y - metaballs_rect.position.y) * factor
+            (metaball_cache[i].x - metaball_rect.position.x) * factor,
+            (metaball_cache[i].y - metaball_rect.position.y) * factor
         );
-        float radius = metaballs_cache[i].z * factor;
+        float radius = metaball_cache[i].z * factor;
         float balancing_factor = 1.0;
         if (metaball_weight_balancing == WEIGHT_BALANCE_LINEAR) {
             balancing_factor = 1.25;
@@ -326,12 +326,12 @@ void FlashPlayer::_draw_metaball() {
         float overweight = 0.0;
         float area = Math_PI * iirad;
         if (metaball_weight_balancing != WEIGHT_BALANCE_NONE) {
-            for (int j=0; j<metaballs_cache.size(); j++) {
+            for (int j=0; j<metaball_cache.size(); j++) {
                 Vector2 jpos = Vector2(
-                    (metaballs_cache[j].x - metaballs_rect.position.x) * factor,
-                    (metaballs_cache[j].y - metaballs_rect.position.y) * factor
+                    (metaball_cache[j].x - metaball_rect.position.x) * factor,
+                    (metaball_cache[j].y - metaball_rect.position.y) * factor
                 );
-                float jrad = metaballs_cache[j].z * factor * balancing_factor;
+                float jrad = metaball_cache[j].z * factor * balancing_factor;
                 float jjrad = jrad * jrad;
 				float dist = (ipos - jpos).length();
                 float dd = dist * dist;
@@ -361,8 +361,8 @@ void FlashPlayer::_draw_metaball() {
 
         VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLE_" + itos(i), circle);
     }
-    VisualServer::get_singleton()->material_set_param(flash_material, "THRESHOLD", metaballs_threshold);
-    VisualServer::get_singleton()->material_set_param(flash_material, "DEBUG_ENABLED", metaballs_debug);
+    VisualServer::get_singleton()->material_set_param(flash_material, "THRESHOLD", metaball_threshold);
+    VisualServer::get_singleton()->material_set_param(flash_material, "DEBUG_ENABLED", metaball_debug);
     indices.resize(0);
     points.resize(0);
     uvs.resize(0);
@@ -608,6 +608,28 @@ void FlashPlayer::set_render_mode(RenderMode p_mode) {
     }
 }
 
+void FlashPlayer::set_metaball_threshold(float p_threshold) {
+    if (p_threshold < 0.0 || p_threshold > 2.0) {
+        ERR_FAIL_MSG("Metaballs threshold must be in range [0.0, 3.0]");
+    }
+    if (metaball_threshold == p_threshold) return;
+    
+    metaball_threshold = p_threshold;
+    update();
+}
+
+void FlashPlayer::set_metaball_debug(bool p_debug) {
+    if (metaball_debug == p_debug) return;
+    metaball_debug = p_debug;
+    update();
+}
+
+void FlashPlayer::set_metaball_weight_balancing(WeightBalancing p_balancing) {
+    if (metaball_weight_balancing == p_balancing) return;
+    metaball_weight_balancing = p_balancing;
+    update();
+}
+
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "active_symbol"){
         String symbols_hint = "[document]";
@@ -647,7 +669,13 @@ void FlashPlayer::_validate_property(PropertyInfo &prop) const {
     if (prop.name == "material" || prop.name == "use_parent_material") {
         prop.usage = PROPERTY_USAGE_NOEDITOR|PROPERTY_USAGE_RESOURCE_NOT_PERSISTENT;
     }
-
+    if (prop.name.begins_with("metaball")) {
+        if (render_mode != RENDER_METABALL) {
+            prop.usage = PROPERTY_USAGE_NOEDITOR;
+        } else {
+            prop.usage = PROPERTY_USAGE_DEFAULT;
+        }
+    }
 }
 bool FlashPlayer::_sort_clips(Variant a, Variant b) const {
     if (!active_symbol.is_valid()) return false;
@@ -711,10 +739,13 @@ void FlashPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_overlay_texture", "texture"), &FlashPlayer::set_overlay_texture);
     ClassDB::bind_method(D_METHOD("get_render_mode"), &FlashPlayer::get_render_mode);
     ClassDB::bind_method(D_METHOD("set_render_mode", "mode"), &FlashPlayer::set_render_mode);
-    ClassDB::bind_method(D_METHOD("get_metaballs_threshold"), &FlashPlayer::get_metaballs_threshold);
-    ClassDB::bind_method(D_METHOD("set_metaballs_threshold", "threshold"), &FlashPlayer::set_metaballs_threshold);
-    ClassDB::bind_method(D_METHOD("is_metaballs_debug"), &FlashPlayer::is_metaballs_debug);
-    ClassDB::bind_method(D_METHOD("set_metaballs_debug", "debug"), &FlashPlayer::set_metaballs_debug);
+    ClassDB::bind_method(D_METHOD("get_metaball_threshold"), &FlashPlayer::get_metaball_threshold);
+    ClassDB::bind_method(D_METHOD("set_metaball_threshold", "threshold"), &FlashPlayer::set_metaball_threshold);
+    ClassDB::bind_method(D_METHOD("is_metaball_debug"), &FlashPlayer::is_metaball_debug);
+    ClassDB::bind_method(D_METHOD("set_metaball_debug", "debug"), &FlashPlayer::set_metaball_debug);
+    ClassDB::bind_method(D_METHOD("set_metaball_weight_balancing", "balancing"), &FlashPlayer::set_metaball_weight_balancing);
+    ClassDB::bind_method(D_METHOD("get_metaball_weight_balancing"), &FlashPlayer::get_metaball_weight_balancing);
+    
 
     ClassDB::bind_method(D_METHOD("_animation_process"), &FlashPlayer::_animation_process);
 
@@ -731,8 +762,9 @@ void FlashPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "active_clip", PROPERTY_HINT_ENUM, ""), "set_active_clip", "get_active_clip");
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "overlay_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture"), "set_overlay_texture", "get_overlay_texture");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "render_mode", PROPERTY_HINT_ENUM, "Normal,Metaball"), "set_render_mode", "get_render_mode");
-    ADD_PROPERTY(PropertyInfo(Variant::REAL, "metaballs_threshold", PROPERTY_HINT_RANGE, "0.1,3.0,0.05"), "set_metaballs_threshold", "get_metaballs_threshold");
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "metaballs_debug", PROPERTY_HINT_NONE, ""), "set_metaballs_debug", "is_metaballs_debug");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "metaball/balancing", PROPERTY_HINT_ENUM, "None,Linear,Exponential"), "set_metaball_weight_balancing", "get_metaball_weight_balancing");
+    ADD_PROPERTY(PropertyInfo(Variant::REAL, "metaball/threshold", PROPERTY_HINT_RANGE, "0.1,3.0,0.05"), "set_metaball_threshold", "get_metaball_threshold");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "metaball/debug", PROPERTY_HINT_NONE, ""), "set_metaball_debug", "is_metaball_debug");
 
     ADD_SIGNAL(MethodInfo("resource_changed"));
     ADD_SIGNAL(MethodInfo("animation_completed"));
@@ -753,6 +785,9 @@ void FlashPlayer::_bind_methods() {
 
     BIND_ENUM_CONSTANT(RENDER_NORMAL);
     BIND_ENUM_CONSTANT(RENDER_METABALL);
+    BIND_ENUM_CONSTANT(WEIGHT_BALANCE_NONE);
+    BIND_ENUM_CONSTANT(WEIGHT_BALANCE_LINEAR);
+    BIND_ENUM_CONSTANT(WEIGHT_BALANCE_EXPONENTIAL);
 
 }
 
@@ -886,8 +921,8 @@ void FlashPlayer::_animation_process() {
     masks.clear();
     clipping_cache.clear();
     clipping_items.clear();
-    metaballs_cache.clear();
-    metaballs_rect = Rect2();
+    metaball_cache.clear();
+    metaball_rect = Rect2();
     processed_frame = frame;
     indices.resize(0);
     points.resize(0);
@@ -1062,13 +1097,13 @@ void FlashPlayer::add_metaball(const Vector2 &p_pos, const float &p_radius) {
     if (is_masking()) {
         return;
     }
-    if (metaballs_cache.size() == 0) {
-        metaballs_rect = Rect2(p_pos - Vector2(p_radius, p_radius), Vector2(p_radius * 2.0, p_radius * 2.0));    
+    if (metaball_cache.size() == 0) {
+        metaball_rect = Rect2(p_pos - Vector2(p_radius, p_radius), Vector2(p_radius * 2.0, p_radius * 2.0));    
     } else {
-        metaballs_rect = metaballs_rect.expand(p_pos - Vector2(p_radius, p_radius));
-        metaballs_rect = metaballs_rect.expand(p_pos + Vector2(p_radius, p_radius));
+        metaball_rect = metaball_rect.expand(p_pos - Vector2(p_radius, p_radius));
+        metaball_rect = metaball_rect.expand(p_pos + Vector2(p_radius, p_radius));
     }
-    metaballs_cache.push_back(Vector3(p_pos.x, p_pos.y, p_radius));
+    metaball_cache.push_back(Vector3(p_pos.x, p_pos.y, p_radius));
 }
 
 void FlashPlayer::queue_animation_event(const String &p_event, bool p_reversed) {
@@ -1203,8 +1238,8 @@ FlashPlayer::FlashPlayer() {
     VisualServer::get_singleton()->material_set_shader(flash_material, normal_shader);
     VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
     render_mode = RENDER_NORMAL;
-    metaballs_threshold = 1.0;
-    metaballs_debug = false;
+    metaball_threshold = 1.0;
+    metaball_debug = false;
     metaball_weight_balancing = WEIGHT_BALANCE_EXPONENTIAL;
     // vs->material_set_shader(flash_material, normal_shader);
 }
