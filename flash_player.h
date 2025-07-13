@@ -26,6 +26,7 @@
 #define FLASH_PLAYER_H
 
 #include <scene/2d/node_2d.h>
+#include <core/set.h>
 
 #include "flash_resources.h"
 
@@ -75,8 +76,8 @@ private:
     WeightBalancing metaball_weight_balancing;
     bool metaball_debug;
     Color metaball_color;
-    static RID normal_shader;
-    static RID metaball_shader;
+    Set<int>  used_masks;
+    static RID flash_shader;
 
     // batcher part
     float processed_frame;
@@ -98,7 +99,7 @@ private:
     HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
-    List<Vector3> metaball_cache;
+    List<Vector3> metaball_circles;
     Rect2 metaball_rect;
     int current_mask;
 
@@ -106,10 +107,10 @@ private:
     int performance_triangles_drawn;
 	int performance_triangles_generated;
 
-    void _generate_normal_shader() const;
-    void _generate_metaball_shader() const;
+    void _generate_flash_shader() const;
     void _draw_normal();
     void _draw_metaball();
+    void _add_metaball_rect();
 
 
 protected:

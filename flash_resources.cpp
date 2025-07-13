@@ -996,6 +996,16 @@ Ref<FlashTextureRect> FlashBitmapInstance::get_texture() {
 }
 
 void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
+    Ref<FlashTextureRect> tex = get_texture();
+    if (!tex.is_valid()) {
+        return;
+    }
+    if (node->is_masking()) {
+        Transform2D scale;
+        scale.scale(tex->get_original_size()/tex->get_region().size);
+        node->mask_add(tr * scale, tex->get_region(), tex->get_index());
+        return;
+    }
     switch (node->get_render_mode()) {
         case FlashPlayer::RENDER_NORMAL: {
             _animation_process_normal(node, time, delta, tr, effect); 
@@ -1008,22 +1018,6 @@ void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float
 
 void FlashBitmapInstance::_animation_process_normal(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     Ref<FlashTextureRect> tex = get_texture();
-    if (!tex.is_valid()) {
-        return;
-    }
-    if (node->is_masking()) {
-        Transform2D scale;
-        scale.scale(tex->get_original_size()/tex->get_region().size);
-        node->mask_add(tr * scale, tex->get_region(), tex->get_index());
-        return;
-    }
-    // if (node->is_masking()) {
-    //     FlashClippingItem item;
-    //     item.transform = tr;
-    //     item.texture = document->load_bitmap(timeline_token);
-    //     node->add_clipping_item(item);
-    //     return;
-    // }
 
     //node->draw_set_transform_matrix(tr);
     Vector<Color> colors;
@@ -1059,9 +1053,7 @@ void FlashBitmapInstance::_animation_process_normal(FlashPlayer* node, float tim
 
 void FlashBitmapInstance::_animation_process_metaball(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
     Ref<FlashTextureRect> tex = get_texture();
-    if (!tex.is_valid()) {
-        return;
-    }
+
     Color color = effect.mult * 0.5;
     if (color.a < 0.05) {
         return; // don't add metaball if alpha is too low

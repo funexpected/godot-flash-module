@@ -30,8 +30,7 @@
 #include <core/engine.h>
 #endif
 
-RID FlashPlayer::normal_shader = RID();
-RID FlashPlayer::metaball_shader = RID();
+RID FlashPlayer::flash_shader = RID();
 
 void FlashPlayer::_notification(int p_what) {
     switch (p_what) {
@@ -64,10 +63,10 @@ void FlashPlayer::_notification(int p_what) {
     }
 };
 
-void FlashPlayer::_generate_normal_shader() const {
-    if (normal_shader.is_valid()) return;
-    normal_shader = VisualServer::get_singleton()->shader_create();
-    VisualServer::get_singleton()->shader_set_code(normal_shader,
+void FlashPlayer::_generate_flash_shader() const {
+    if (flash_shader.is_valid()) return;
+    flash_shader = VisualServer::get_singleton()->shader_create();
+    VisualServer::get_singleton()->shader_set_code(flash_shader,
         "shader_type canvas_item;\n"
 
         "uniform sampler2DArray ATLAS;\n"
@@ -79,6 +78,61 @@ void FlashPlayer::_generate_normal_shader() const {
         "varying float CLIPPING_IDX[4];"
         "varying vec4 CLIPPING_UV[4];\n"
         "varying float TEX_IDX;\n"
+
+        "uniform bool METABALL_ENABLED;\n"
+        "uniform bool DEBUG_ENABLED;\n"
+        "uniform int CIRCLES_COUNT;\n"
+        "uniform float THRESHOLD;\n"
+        "uniform vec4 CIRCLE_0;\n"
+        "uniform vec4 CIRCLE_1;\n"
+        "uniform vec4 CIRCLE_2;\n"
+        "uniform vec4 CIRCLE_3;\n"
+        "uniform vec4 CIRCLE_4;\n"
+        "uniform vec4 CIRCLE_5;\n"
+        "uniform vec4 CIRCLE_6;\n"
+        "uniform vec4 CIRCLE_7;\n"
+        "uniform vec4 CIRCLE_8;\n"
+        "uniform vec4 CIRCLE_9;\n"
+        "uniform vec4 CIRCLE_10;\n"
+        "uniform vec4 CIRCLE_11;\n"
+        "uniform vec4 CIRCLE_12;\n"
+        "uniform vec4 CIRCLE_13;\n"
+        "uniform vec4 CIRCLE_14;\n"
+        "uniform vec4 CIRCLE_15;\n"
+
+        "float metaball(vec2 uv) {\n"
+        "   float v = 0.0;\n"
+        "   float debug = 0.0;\n"
+        "   vec4 circles[16] = vec4[](\n"
+        "       CIRCLE_0, CIRCLE_1, CIRCLE_2, CIRCLE_3,\n"
+        "       CIRCLE_4, CIRCLE_5, CIRCLE_6, CIRCLE_7,\n"
+        "       CIRCLE_8, CIRCLE_9, CIRCLE_10, CIRCLE_11,\n"
+        "       CIRCLE_12, CIRCLE_13, CIRCLE_14, CIRCLE_15\n"
+        "   );\n"
+        "   for (int i = 0; i < CIRCLES_COUNT; i++) {\n"
+        "      vec2 center = circles[i].xy;\n"
+        "      float r = circles[i].z;\n"
+        "      float overweight = circles[i].w;\n"
+        "      vec2 dir = uv - center;\n"
+        // "      float d = dot(dir, dir);\n"
+        "      float d = dot(dir, dir);\n"
+        "      v += overweight * r / (d + 0.0000001);\n"
+        "      if (d < r + 0.0002 && d > r - 0.0002) {\n"
+		"           debug = max(debug, 1.0);\n"
+		"      }\n"
+        "   }\n"
+        "   float edge = 0.01;\n"
+        "   if (DEBUG_ENABLED && debug > 0.0) {\n"
+        "       return -debug;\n"
+        "   } else {\n"
+        "       float alpha = smoothstep(THRESHOLD - edge, THRESHOLD + edge, v);\n"
+        "       if (alpha > 0.01) {\n"
+        "           return alpha;\n"
+        "       } else {\n"
+        "           return 0.0;\n"
+        "       }\n"
+        "   }\n"
+        "}\n"
 
         "void vertex() {\n"
         "   float clipping_size_with_tex_idx = 0.0;\n"
@@ -126,105 +180,33 @@ void FlashPlayer::_generate_normal_shader() const {
         "   }\n"
         "   if (masked > 0.0) {\n"
         "       vec4 add;\n"
-        "       vec4 c = texture(ATLAS, vec3(UV, TEX_IDX));\n"
-        "       vec4 mult = 2.0*modf(COLOR, add);\n"
-        "       COLOR = clamp(abs(c * mult) + add / 255.0, vec4(0.0), vec4(1.0));\n"
         "       if (OVERLAY_ENABLED) {\n"
         "           COLOR.rgb = texture(OVERLAY_TEXTURE, SCREEN_UV).rgb;\n"
-        "       }"
-        "       if (c.a <= 0.0) {\n"
-        "           COLOR.a = 0.0;\n"
-        "       } else {\n"
-        "           COLOR.a = min(COLOR.a, masked);\n"
+        "       } else if (!METABALL_ENABLED) {\n"
+        "           vec4 c = texture(ATLAS, vec3(UV, TEX_IDX));\n"
+        "           vec4 mult = 2.0*modf(COLOR, add);\n"
+        "           COLOR = clamp(abs(c * mult) + add / 255.0, vec4(0.0), vec4(1.0));\n"
+        "           if (c.a <= 0.0) {\n"
+        "               discard;\n"
+        "           } else {\n"
+        "               COLOR.a = min(COLOR.a, masked);\n"
+        "           }\n"
+        "       }\n"
+        "       if (METABALL_ENABLED) {\n"
+        "           float alpha = metaball(UV);\n"
+        "           if (alpha == 0.0) {\n"
+        "               discard;\n"
+        "           } else if (alpha < 0.0) {\n"
+                        // debug metaball
+        "               COLOR = vec4(0.9, 0.1, 0.1, -alpha);\n"
+        "           } else {\n"
+        "               COLOR.a = min(alpha, masked);\n"
+        "           }\n"
         "       }\n"
         "   } else {\n"
-        "       COLOR = vec4(0.0);\n"
+        "       discard;\n"
         "   }\n"
         "}\n"
-    );
-}
-
-void FlashPlayer::_generate_metaball_shader() const {
-    if (metaball_shader.is_valid()) return;
-    metaball_shader = VisualServer::get_singleton()->shader_create();
-    VisualServer::get_singleton()->shader_set_code(metaball_shader,
-        "shader_type canvas_item;\n"
-        "uniform bool OVERLAY_ENABLED;\n"
-        "uniform sampler2D OVERLAY_TEXTURE;\n"
-        "uniform float THRESHOLD : hint_range(0.0, 2.0) = 0.3;\n"
-        "uniform bool DEBUG_ENABLED;\n"
-        "uniform int CIRCLES_COUNT;\n"
-        "uniform vec4 CIRCLE_0;\n"
-        "uniform vec4 CIRCLE_1;\n"
-        "uniform vec4 CIRCLE_2;\n"
-        "uniform vec4 CIRCLE_3;\n"
-        "uniform vec4 CIRCLE_4;\n"
-        "uniform vec4 CIRCLE_5;\n"
-        "uniform vec4 CIRCLE_6;\n"
-        "uniform vec4 CIRCLE_7;\n"
-        "uniform vec4 CIRCLE_8;\n"
-        "uniform vec4 CIRCLE_9;\n"
-        "uniform vec4 CIRCLE_10;\n"
-        "uniform vec4 CIRCLE_11;\n"
-        "uniform vec4 CIRCLE_12;\n"
-        "uniform vec4 CIRCLE_13;\n"
-        "uniform vec4 CIRCLE_14;\n"
-        "uniform vec4 CIRCLE_15;\n"
-
-        "void fragment() {\n"
-        "   vec2 uv = UV;\n"
-        "   float v = 0.0;\n"
-        "   float debug = 0.0;\n"
-        "   vec4 circles[16] = vec4[](\n"
-        "       CIRCLE_0, CIRCLE_1, CIRCLE_2, CIRCLE_3,\n"
-        "       CIRCLE_4, CIRCLE_5, CIRCLE_6, CIRCLE_7,\n"
-        "       CIRCLE_8, CIRCLE_9, CIRCLE_10, CIRCLE_11,\n"
-        "       CIRCLE_12, CIRCLE_13, CIRCLE_14, CIRCLE_15\n"
-        "   );\n"
-        "   for (int i = 0; i < CIRCLES_COUNT; i++) {\n"
-        "      vec2 center = circles[i].xy;\n"
-        "      float r = circles[i].z;\n"
-        "      float overweight = circles[i].w;\n"
-        "      vec2 dir = uv - center;\n"
-        // "      float d = dot(dir, dir);\n"
-        "      float d = dot(dir, dir);\n"
-        "      v += overweight * r / (d + 0.0000001);\n"
-        "      if (d < r + 0.0002 && d > r - 0.0002) {\n"
-		"           debug = max(debug, 1.0);\n"
-		"      }\n"
-        "}\n"
-        // "v = 0.5 + log(v);\n"
-        // "v = v / float(CIRCLES_COUNT);\n"
-        // // Пример: 3 круга, их центры и радиусы можно передавать через uniform
-        // vec2 centers[3] = vec2[](vec2(0.5 + 0.3*sin(TIME),0.5), vec2(
-        //     0.5 + 0.35*sin(1.25*TIME),
-        //     0.5 - 0.35*cos(1.25*TIME)
-        // ), vec2(0.7,0.6 + 0.3*sin(0.75*TIME)));
-        // float radii[3] = float[](0.1, 0.15, 0.25);
-        // for (int i = 0; i < 3; i++) {
-            
-        //     vec2 rad = uv - centers[i];
-        //     float d = dot(rad, rad);
-        //     v += radii[i]*radii[i] / (d + 0.0001);
-        // }
-            
-        "   float edge = 0.01;\n"
-        "   float alpha = smoothstep(THRESHOLD - edge, THRESHOLD + edge, v);\n"
-        "   if (DEBUG_ENABLED && debug > 0.0) {\n"
-        "       COLOR = vec4(0.9, 0.1, 0.1, 1);\n"
-        
-        "   } else if (alpha > 0.01) {\n"
-        // "   if (alpha > 0.01) {\n"
-        "       if (OVERLAY_ENABLED) {\n"
-        "           COLOR.rgb = texture(OVERLAY_TEXTURE, SCREEN_UV).rgb;\n"
-        "       }"
-        "       COLOR.a = alpha;\n"
-        "   } else {\n"
-        "       discard;\n"    
-        // "       COLOR = vec4(1.0, 1.0, 1.0, 0.2);\n"
-        "   }\n"
-        "}\n"
-
     );
 }
 
@@ -250,46 +232,6 @@ void FlashPlayer::_draw_normal() {
 }
 
 void FlashPlayer::_draw_metaball() {
-    if (metaball_cache.size() == 0) return;
-    if (metaball_rect.size.x <= 0.0 || metaball_rect.size.y <= 0.0) {
-        return; // No metaball to draw
-    }
-    Vector2 size;
-    float factor;
-    metaball_rect = metaball_rect.expand(metaball_rect.position - Vector2(150., 150.));
-    metaball_rect = metaball_rect.expand(metaball_rect.position + metaball_rect.size + Vector2(150., 150.));
-    if (metaball_rect.size.x > metaball_rect.size.y) {
-        size.y = 1.0;
-        factor = 1.0 / metaball_rect.size.y;
-        size.x = metaball_rect.size.x / metaball_rect.size.y;
-    } else {
-        size.x = 1.0;
-        factor = 1.0 / metaball_rect.size.x;
-        size.y = metaball_rect.size.y / metaball_rect.size.x;
-    }
-    
-    points.push_back(metaball_rect.position);
-    points.push_back(metaball_rect.position + Vector2(metaball_rect.size.x, 0.0));
-    points.push_back(metaball_rect.position + metaball_rect.size);
-    points.push_back(metaball_rect.position + Vector2(0.0, metaball_rect.size.y));
-    uvs.push_back(Vector2(0.0, 0.0));
-    uvs.push_back(Vector2(size.x, 0.0));
-    uvs.push_back(Vector2(size.x, size.y));
-    uvs.push_back(Vector2(0.0, size.y));
-    colors.push_back(metaball_color);
-    colors.push_back(metaball_color);
-    colors.push_back(metaball_color);
-    colors.push_back(metaball_color);
-    indices.push_back(0);
-    indices.push_back(1);
-    indices.push_back(2);
-    indices.push_back(0);
-    indices.push_back(2);
-    indices.push_back(3);
-
-    // draw_polygon(points, colors, uvs);
-    // draw_rect(metaball_rect, Color(1.0, 1.0, 1.0, 1.0), true);
-
     VisualServer::get_singleton()->mesh_clear(mesh);
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
@@ -304,15 +246,79 @@ void FlashPlayer::_draw_metaball() {
         VisualServer::ARRAY_FLAG_USE_2D_VERTICES
     );
     VisualServer::get_singleton()->canvas_item_add_mesh(get_canvas_item(), mesh);
+}
 
-    VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLES_COUNT", metaball_cache.size());
+void FlashPlayer::_add_metaball_rect() {
+    if (points.size()) return;
+    Rect2 rect = metaball_rect;
+    if (metaball_circles.size() == 0) return;
+    if (rect.size.x <= 0.0 || rect.size.y <= 0.0) {
+        return; // No metaball to draw
+    }
+    Vector2 size;
+    float factor;
+    rect = rect.expand(rect.position - Vector2(150., 150.));
+    rect = rect.expand(rect.position + rect.size + Vector2(150., 150.));
+    if (rect.size.x > rect.size.y) {
+        size.y = 1.0;
+        factor = 1.0 / rect.size.y;
+        size.x = rect.size.x / rect.size.y;
+    } else {
+        size.x = 1.0;
+        factor = 1.0 / rect.size.x;
+        size.y = rect.size.y / rect.size.x;
+    }
+    if (size.x > 1.0) {
+        size.y /= size.x;
+        factor /= size.x;
+        size.x = 1.0;
+    } else if (size.y > 1.0) {
+        size.x /= size.y;
+        factor /= size.y;
+        size.y = 1.0;
+    }
+    
+    
+    points.push_back(rect.position);
+    points.push_back(rect.position + Vector2(rect.size.x, 0.0));
+    points.push_back(rect.position + rect.size);
+    points.push_back(rect.position + Vector2(0.0, rect.size.y));
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
+    colors.push_back(metaball_color);
+    indices.push_back(0);
+    indices.push_back(1);
+    indices.push_back(2);
+    indices.push_back(0);
+    indices.push_back(2);
+    indices.push_back(3);
 
-    for (int i=0; i<metaball_cache.size(); i++){
+    for (Set<int>::Element *E = used_masks.front(); E; E = E->next()) {
+        int mask_id = E->get();
+        for (List<FlashMaskItem>::Element *E = masks[mask_id].front(); E; E = E->next()) {
+            clipping_cache.push_back(E->get());
+        }
+    }
+    update_clipping_data();
+
+    int clipping_id = 0;
+    int clipping_size_with_tex_idx = (clipping_cache.size() << 8) | (0 & 0xff);
+    // print_line(String() + "Adding metaball rect " + String(size) + ", factor =" + String(Variant(factor)));
+    uvs.push_back(Vector2(0.0, 0.0) * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
+    uvs.push_back(Vector2(size.x, 0.0) * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
+    uvs.push_back(Vector2(size.x, size.y) * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
+    uvs.push_back(Vector2(0.0, size.y) * 0.5 + Vector2(clipping_id, clipping_size_with_tex_idx));
+
+
+    VisualServer::get_singleton()->material_set_param(flash_material, "CIRCLES_COUNT", metaball_circles.size());
+
+    for (int i=0; i<metaball_circles.size(); i++){
         Vector2 ipos = Vector2(
-            (metaball_cache[i].x - metaball_rect.position.x) * factor,
-            (metaball_cache[i].y - metaball_rect.position.y) * factor
+            (metaball_circles[i].x - rect.position.x) * factor,
+            (metaball_circles[i].y - rect.position.y) * factor
         );
-        float radius = metaball_cache[i].z * factor;
+        float radius = metaball_circles[i].z * factor;
         float balancing_factor = 1.0;
         if (metaball_weight_balancing == WEIGHT_BALANCE_LINEAR) {
             balancing_factor = 1.25;
@@ -324,12 +330,12 @@ void FlashPlayer::_draw_metaball() {
         float overweight = 0.0;
         float area = Math_PI * iirad;
         if (metaball_weight_balancing != WEIGHT_BALANCE_NONE) {
-            for (int j=0; j<metaball_cache.size(); j++) {
+            for (int j=0; j<metaball_circles.size(); j++) {
                 Vector2 jpos = Vector2(
-                    (metaball_cache[j].x - metaball_rect.position.x) * factor,
-                    (metaball_cache[j].y - metaball_rect.position.y) * factor
+                    (metaball_circles[j].x - rect.position.x) * factor,
+                    (metaball_circles[j].y - rect.position.y) * factor
                 );
-                float jrad = metaball_cache[j].z * factor * balancing_factor;
+                float jrad = metaball_circles[j].z * factor * balancing_factor;
                 float jjrad = jrad * jrad;
 				float dist = (ipos - jpos).length();
                 float dd = dist * dist;
@@ -361,10 +367,6 @@ void FlashPlayer::_draw_metaball() {
     }
     VisualServer::get_singleton()->material_set_param(flash_material, "THRESHOLD", metaball_threshold);
     VisualServer::get_singleton()->material_set_param(flash_material, "DEBUG_ENABLED", metaball_debug);
-    indices.resize(0);
-    points.resize(0);
-    uvs.resize(0);
-    colors.resize(0);
 }
 void FlashPlayer::override_frame(String p_symbol, Variant p_value) {
     //ERR_FAIL_COND_MSG(resource.is_null(), "Can't override symbol without resource");
@@ -583,27 +585,26 @@ void FlashPlayer::set_render_mode(RenderMode p_mode) {
     if (render_mode == p_mode) return;
     render_mode = p_mode;
     if (render_mode == RENDER_NORMAL) {
-        VisualServer::get_singleton()->material_set_shader(flash_material, normal_shader);
-        if (resource.is_valid()) {
-            VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
-            VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
-        }
-        VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
-        VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_ENABLED", overlay_texture.is_valid());
-        if (overlay_texture.is_valid()) {
-            VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", overlay_texture);
-        } else {
-            VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", RID());
-        }
-    } else if (render_mode == RENDER_METABALL) {
-        VisualServer::get_singleton()->material_set_shader(flash_material, metaball_shader);
-        VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_ENABLED", overlay_texture.is_valid());
-        if (overlay_texture.is_valid()) {
-            VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", overlay_texture);
-        } else {
-            VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", RID());
-        }
+        VisualServer::get_singleton()->material_set_param(flash_material, "METABALL_ENABLED", false);
+    } else {
+        VisualServer::get_singleton()->material_set_param(flash_material, "METABALL_ENABLED", true);
     }
+    VisualServer::get_singleton()->material_set_shader(flash_material, flash_shader);
+    if (resource.is_valid()) {
+        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
+        VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
+    }
+    VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
+    VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_ENABLED", overlay_texture.is_valid());
+    if (overlay_texture.is_valid()) {
+        VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", overlay_texture);
+    } else {
+        VisualServer::get_singleton()->material_set_param(flash_material, "OVERLAY_TEXTURE", RID());
+    }
+
+    tracks_dirty = true;
+    queue_process();
+    _change_notify();
 }
 
 void FlashPlayer::set_metaball_threshold(float p_threshold) {
@@ -613,25 +614,29 @@ void FlashPlayer::set_metaball_threshold(float p_threshold) {
     if (metaball_threshold == p_threshold) return;
     
     metaball_threshold = p_threshold;
-    update();
+    tracks_dirty = true;
+    queue_process();
 }
 
 void FlashPlayer::set_metaball_debug(bool p_debug) {
     if (metaball_debug == p_debug) return;
     metaball_debug = p_debug;
-    update();
+    tracks_dirty = true;
+    queue_process();
 }
 
 void FlashPlayer::set_metaball_weight_balancing(WeightBalancing p_balancing) {
     if (metaball_weight_balancing == p_balancing) return;
     metaball_weight_balancing = p_balancing;
-    update();
+    tracks_dirty = true;
+    queue_process();
 }
 
 void FlashPlayer::set_metaball_color(const Color &p_color) {
     if (metaball_color == p_color) return;
     metaball_color = p_color;
-    update();
+    tracks_dirty = true;
+    queue_process();
 }
 
 void FlashPlayer::_validate_property(PropertyInfo &prop) const {
@@ -703,10 +708,10 @@ void FlashPlayer::set_resource(const Ref<FlashDocument> &doc) {
         active_symbol = resource->get_main_timeline();
         if (active_symbol.is_valid())
             playback_end = active_symbol->get_duration();
-        if (render_mode == RENDER_NORMAL) {
+        // if (render_mode == RENDER_NORMAL) {
             VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS_SIZE", resource->get_atlas_size());
             VisualServer::get_singleton()->material_set_param(flash_material, "ATLAS", resource->get_atlas());
-        }
+        // }
     } else {
         frame_overrides.resize(0);
     }
@@ -924,17 +929,19 @@ void FlashPlayer::_animation_process() {
         queued_delta = 0.0;
         return;
     }
+    // print_line("Animation process");
     events.clear();
     masks.clear();
     clipping_cache.clear();
     clipping_items.clear();
-    metaball_cache.clear();
+    metaball_circles.clear();
     metaball_rect = Rect2();
     processed_frame = frame;
     indices.resize(0);
     points.resize(0);
     colors.resize(0);
     uvs.resize(0);
+    used_masks.clear();
 
     if (!active_symbol.is_valid()) {
         update();
@@ -945,6 +952,9 @@ void FlashPlayer::_animation_process() {
     }
 
     active_symbol->animation_process(this, frame, queued_delta);
+    if (render_mode == RENDER_METABALL) {
+        _add_metaball_rect();
+    }
     update();
     performance_triangles_generated = indices.size() / 3;
 
@@ -1083,14 +1093,19 @@ void FlashPlayer::advance_clip_for_track(const String &p_track, const String &p_
 }
 
 void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx) {
-    // Array pt
-    Vector2 s = p_points[2] - p_points[0];
-    float area = s.x * s.y;
-    
-    Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
-    for (int i=0; i<local_indices.size(); i++){
-        indices.push_back(local_indices[i] + points.size());
+     if (is_masking()) {
+        return;
     }
+    // Vector<int> local_indices = Geometry::triangulate_polygon(p_points);
+    // for (int i=0; i<local_indices.size(); i++){
+    //     indices.push_back(local_indices[i] + points.size());
+    // }
+    indices.push_back(0 + points.size());
+    indices.push_back(1 + points.size());
+    indices.push_back(2 + points.size());
+    indices.push_back(0 + points.size());
+    indices.push_back(2 + points.size());
+    indices.push_back(3 + points.size());
     int clipping_id = clipping_cache.size();
     int clipping_size_with_tex_idx = (clipping_items.size() << 8) | (p_texture_idx & 0xff);
     for (int i=0; i<p_points.size(); i++) {
@@ -1101,16 +1116,15 @@ void FlashPlayer::add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, 
 }
 
 void FlashPlayer::add_metaball(const Vector2 &p_pos, const float &p_radius) {
-    if (is_masking()) {
-        return;
-    }
-    if (metaball_cache.size() == 0) {
+
+    if (metaball_circles.size() == 0) {
         metaball_rect = Rect2(p_pos - Vector2(p_radius, p_radius), Vector2(p_radius * 2.0, p_radius * 2.0));    
     } else {
         metaball_rect = metaball_rect.expand(p_pos - Vector2(p_radius, p_radius));
         metaball_rect = metaball_rect.expand(p_pos + Vector2(p_radius, p_radius));
     }
-    metaball_cache.push_back(Vector3(p_pos.x, p_pos.y, p_radius));
+    // print_line(String() + "Adding metaball at " + String(p_pos) + ", radius=" + String(Variant(p_radius)) + ", rect=" + String(metaball_rect));
+    metaball_circles.push_back(Vector3(p_pos.x, p_pos.y, p_radius));
 }
 
 void FlashPlayer::queue_animation_event(const String &p_event, bool p_reversed) {
@@ -1159,6 +1173,7 @@ void FlashPlayer::mask_begin(int mask_id) {
     if (!current_mask) current_mask = mask_id;
     masks.set(current_mask, List<FlashMaskItem>());
     mask_stack.push_back(mask_id);
+    // print_line("Mask begin");
 }
 void FlashPlayer::mask_end(int mask_id) {
     if (current_mask == mask_id) {
@@ -1169,6 +1184,7 @@ void FlashPlayer::mask_end(int mask_id) {
             current_mask = 0;
         }
     }
+    // print_line("Mask end");
 }
 bool FlashPlayer::is_masking() {
     return current_mask > 0;
@@ -1182,21 +1198,37 @@ void FlashPlayer::mask_add(Transform2D p_transform, Rect2i p_texture_region, int
         masks.set(current_mask, List<FlashMaskItem>());
     }
     masks[current_mask].push_back(item);
+    // print_line("Adding mask item, id=" + itos(current_mask));
 }
 void FlashPlayer::clip_begin(int mask_id) {
     if (!masks.has(mask_id)) {
         print_line("No flash mask found, id=" + itos(mask_id));
         return;
     }
-    for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
-        clipping_cache.push_back(E->get());
-    }
-    for (List<FlashMaskItem>::Element *E = masks[mask_id].front(); E; E = E->next()) {
-        clipping_items.push_back(E->get());
+    if (render_mode == RENDER_METABALL) {
+        used_masks.insert(mask_id);
+        // print_line("Adding metaball mask " + itos(mask_id));
+    } else {
+        // print_line("Clipping begin, mask_id=" + itos(mask_id));
+        // if (render_mode == RENDER_METABALL && points.size() > 0) {
+        //     ERR_FAIL_MSG("Can't begin new clip after metaball added this frame.");
+        //     return;
+        // }
+        for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
+            clipping_cache.push_back(E->get());
+        }
+        for (List<FlashMaskItem>::Element *E = masks[mask_id].front(); E; E = E->next()) {
+            // print_line("Adding clipping item");
+            clipping_items.push_back(E->get());
+        }
     }
 }
 void FlashPlayer::clip_end(int mask_id) {
-    if (!masks.has(mask_id)) return;
+    if (render_mode == RENDER_METABALL || !masks.has(mask_id)) return;
+    // if (render_mode == RENDER_METABALL) {
+    //     _add_metaball_rect();
+    // }
+    // print_line("Clipping end, mask_id=" + itos(mask_id));
     for (List<FlashMaskItem>::Element *E = clipping_items.front(); E; E = E->next()) {
         clipping_cache.push_back(E->get());
     }
@@ -1240,15 +1272,41 @@ FlashPlayer::FlashPlayer() {
     flash_material = vs->material_create();
     vs->canvas_item_set_material(get_canvas_item(), flash_material);
     mesh = vs->mesh_create();
-    _generate_normal_shader();
-    _generate_metaball_shader();
-    VisualServer::get_singleton()->material_set_shader(flash_material, normal_shader);
+    _generate_flash_shader();
+    VisualServer::get_singleton()->material_set_shader(flash_material, flash_shader);
     VisualServer::get_singleton()->material_set_param(flash_material, "CLIPPING_TEXTURE", clipping_texture);
+    VisualServer::get_singleton()->material_set_param(flash_material, "METABALL_ENABLED", false);
     render_mode = RENDER_NORMAL;
     metaball_threshold = 1.0;
     metaball_debug = false;
     metaball_weight_balancing = WEIGHT_BALANCE_EXPONENTIAL;
     metaball_color = Color(0.415686, 0.352941, 0.788235);
-    // vs->material_set_shader(flash_material, normal_shader);
+    // vs->material_set_shader(flash_material, flash_shader);
 }
 #endif
+
+// Animation process
+// Mask begin
+// Mask end
+// Adding polygon, clipping_id = 0
+// Adding polygon, clipping_id = 0
+// Clipping begin, mask_id=3848
+// Adding polygon, clipping_id = 0
+// Clipping end, mask_id=3848
+// Clipping begin, mask_id=3848
+// Adding polygon, clipping_id = 1
+// Clipping end, mask_id=3848
+
+
+// Animation process
+// Mask begin
+// Mask end
+// Add metaball circle, radius = 165.230942
+// Add metaball circle, radius = 142.666397
+// Clipping begin, mask_id=3848
+// Add metaball circle, radius = 180.026215
+// Adding clipping rect with id: 0
+// Clipping end, mask_id=3848
+// Clipping begin, mask_id=3848
+// Add metaball circle, radius = 163.355103
+// Clipping end, mask_id=3848
