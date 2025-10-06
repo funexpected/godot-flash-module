@@ -1006,13 +1006,18 @@ void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float
         node->mask_add(tr * scale, tex->get_region(), tex->get_index());
         return;
     }
-    // if (node->is_masking()) {
-    //     FlashClippingItem item;
-    //     item.transform = tr;
-    //     item.texture = document->load_bitmap(timeline_token);
-    //     node->add_clipping_item(item);
-    //     return;
-    // }
+    switch (node->get_render_mode()) {
+        case FlashPlayer::RENDER_NORMAL: {
+            _animation_process_normal(node, time, delta, tr, effect); 
+        } break;
+        case FlashPlayer::RENDER_METABALL: {
+            _animation_process_metaball(node, time, delta, tr, effect); 
+        } break;
+    }
+}
+
+void FlashBitmapInstance::_animation_process_normal(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
+    Ref<FlashTextureRect> tex = get_texture();
 
     //node->draw_set_transform_matrix(tr);
     Vector<Color> colors;
@@ -1044,6 +1049,19 @@ void FlashBitmapInstance::animation_process(FlashPlayer* node, float time, float
     }
 
     node->add_polygon(points, colors, uvs, tex->get_index());
+}
+
+void FlashBitmapInstance::_animation_process_metaball(FlashPlayer* node, float time, float delta, Transform2D tr, FlashColorEffect effect) {
+    Ref<FlashTextureRect> tex = get_texture();
+
+    Color color = effect.mult * 0.5;
+    if (color.a < 0.05) {
+        return; // don't add metaball if alpha is too low
+    }
+    Vector2 size = tex->get_original_size() * tr.get_scale();
+    float radius = 0.25*(size.x + size.y);
+    Vector2 center = tr.xform(tex->get_original_size() * 0.5);
+    node->add_metaball(center, radius);
 }
 
 void FlashTween::_bind_methods() {

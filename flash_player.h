@@ -26,6 +26,7 @@
 #define FLASH_PLAYER_H
 
 #include <scene/2d/node_2d.h>
+#include <core/set.h>
 
 #include "flash_resources.h"
 
@@ -40,6 +41,19 @@ struct FlashMaskItem {
 
 class FlashPlayer: public Node2D {
     GDCLASS(FlashPlayer, Node2D);
+public:
+    enum RenderMode {
+        RENDER_NORMAL,
+        RENDER_METABALL
+    };
+
+    enum WeightBalancing {
+        WEIGHT_BALANCE_NONE,
+        WEIGHT_BALANCE_LINEAR,
+        WEIGHT_BALANCE_EXPONENTIAL
+    };
+
+private:
 
     // renderer part
     float frame;
@@ -57,6 +71,12 @@ class FlashPlayer: public Node2D {
     bool loop;
     RID flash_material;
     RID mesh;
+    RenderMode render_mode;
+    float metaball_threshold;
+    WeightBalancing metaball_weight_balancing;
+    bool metaball_debug;
+    Color metaball_color;
+    Set<int>  used_masks;
     static RID flash_shader;
 
     // batcher part
@@ -72,17 +92,26 @@ class FlashPlayer: public Node2D {
     HashMap<String, String> active_clips;
     Ref<Image> clipping_data;
     Ref<ImageTexture> clipping_texture;
+    Ref<Texture> overlay_texture;
     HashMap<int, List<FlashMaskItem>> masks;
     List<int> mask_stack;
     Vector<int> frame_overrides;
     HashMap<String, String> active_variants;
     List<FlashMaskItem> clipping_cache;
     List<FlashMaskItem> clipping_items;
+    List<Vector3> metaball_circles;
+    Rect2 metaball_rect;
     int current_mask;
 
 
     int performance_triangles_drawn;
 	int performance_triangles_generated;
+
+    void _generate_flash_shader() const;
+    void _draw_normal();
+    void _draw_metaball();
+    void _add_metaball_rect();
+
 
 protected:
     void _notification(int p_what);
@@ -122,8 +151,28 @@ public:
     void set_active_symbol(String p_symbol);
     String get_active_clip() const;
     void set_active_clip(String p_clip);
+    Ref<Texture> get_overlay_texture() const;
+    void set_overlay_texture(const Ref<Texture> &p_texture);
     PoolStringArray get_symbols() const;
     PoolStringArray get_clips(String p_symbol=String()) const;
+    RenderMode get_render_mode() const { return render_mode; }
+    void set_render_mode(RenderMode p_mode);
+    void set_metaball_threshold(float p_threshold);
+    float get_metaball_threshold() const {
+        return metaball_threshold;
+    }
+    bool is_metaball_debug() const {
+        return metaball_debug;
+    }
+    void set_metaball_debug(bool p_debug);
+    WeightBalancing get_metaball_weight_balancing() const {
+        return metaball_weight_balancing;
+    }
+    void set_metaball_weight_balancing(WeightBalancing p_mode);
+    Color get_metaball_color() const {
+        return metaball_color;
+    }
+    void set_metaball_color(const Color &p_color);
 
     // batcher part
     void queue_animation_process();
@@ -134,6 +183,7 @@ public:
     void advance_clip_for_track_wrapper(const String &p_track, const String &p_clip, float p_time, bool p_seek);
     void update_clipping_data();
     void add_polygon(Vector<Vector2> p_points, Vector<Color> p_colors, Vector<Vector2> p_uvs, int p_texture_idx);
+    void add_metaball(const Vector2 &p_pos, const float &p_radius);
     void queue_animation_event(const String &p_name, bool p_reversed=false);
 
     bool is_masking();
@@ -145,6 +195,8 @@ public:
     void clip_end(int layer);
 };
 
+VARIANT_ENUM_CAST(FlashPlayer::RenderMode);
+VARIANT_ENUM_CAST(FlashPlayer::WeightBalancing);
 
 #endif
 #endif
