@@ -1320,9 +1320,6 @@ void FlashTextureRect::_bind_methods() {
 }
 
 RES ResourceFormatLoaderFlashTexture::load(const String &p_path, const String &p_original_path, Error *r_error) {
-#ifdef SERVER_ENABLED
-    return Ref<TextureArray>();
-#endif
 	FileAccess *f = FileAccess::open(p_path, FileAccess::READ);
     int decompressed_size = f->get_32();
     int bytes;
