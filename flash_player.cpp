@@ -68,6 +68,7 @@ void FlashPlayer::_generate_flash_shader() const {
     flash_shader = VisualServer::get_singleton()->shader_create();
     VisualServer::get_singleton()->shader_set_code(flash_shader,
         "shader_type canvas_item;\n"
+        "render_mode blend_premul_alpha;\n"
 
         "uniform sampler2DArray ATLAS;\n"
         "uniform sampler2D CLIPPING_TEXTURE;\n"
