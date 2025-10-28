@@ -173,7 +173,7 @@ void FlashPlayer::_generate_flash_shader() const {
         "           vec4 mask;"
         // avoid artefacts on the image edge
         "           if (CLIPPING_UV[i].x >= 0.1 && CLIPPING_UV[i].x <= 0.9 && CLIPPING_UV[i].y >= 0.1 && CLIPPING_UV[i].y <= 0.9) {\n"
-        "               mask = texture(ATLAS, vec3(CLIPPING_UV[i].zw, CLIPPING_IDX[i]), -1.0);\n"
+        "               mask = texture(ATLAS, vec3(CLIPPING_UV[i].zw, CLIPPING_IDX[i]));\n"
         "           } else {\n"
         // we could use textureLod for everything, but some android devices has artefacts on alpha border
         "               mask = textureLod(ATLAS, vec3(CLIPPING_UV[i].zw, CLIPPING_IDX[i]), 0.0);\n"
