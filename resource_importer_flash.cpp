@@ -34,7 +34,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 14;
+const int ResourceImporterFlash::importer_version = 15;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
@@ -346,6 +346,14 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
 			r_platform_variants->push_back("pvrtc");
 			formats_imported.push_back("pvrtc");
 		}
+
+        Vector<Ref<Image>> empty_images;
+        _save_tex(p_save_path + ".Server.ftex", empty_images,
+            compress_mode, Image::COMPRESS_PVRTC4, mipmaps, tex_flags);
+        doc->set_atlas(ResourceLoader::load(p_save_path + ".Server.ftex"));
+        ResourceSaver::save(p_save_path + ".Server." + extension, doc);
+        r_platform_variants->push_back("Server");
+        formats_imported.push_back("Server");
 
 		if (!ok_on_pc) {
 			//EditorNode::add_io_error("Warning, no suitable PC VRAM compression enabled in Project Settings. This texture will not display correctly on PC.");
