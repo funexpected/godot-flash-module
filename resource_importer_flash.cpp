@@ -34,7 +34,7 @@
 #include "resource_importer_flash.h"
 #include "flash_resources.h"
 
-const int ResourceImporterFlash::importer_version = 15;
+const int ResourceImporterFlash::importer_version = 14;
 
 String ResourceImporterFlash::get_importer_name() const {
     return "flash";
@@ -270,7 +270,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
             }
         }
         //img->optimize_channels();
-        img->premultiply_alpha();
+        // img->premultiply_alpha();
         spritesheet_images.push_back(img);
     }
 
