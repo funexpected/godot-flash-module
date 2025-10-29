@@ -270,7 +270,7 @@ Error ResourceImporterFlash::import(const String &p_source_file, const String &p
             }
         }
         //img->optimize_channels();
-        // img->premultiply_alpha();
+        img->premultiply_alpha();
         spritesheet_images.push_back(img);
     }
 
